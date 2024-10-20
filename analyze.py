@@ -7,9 +7,9 @@ import time
 import warnings
 import webbrowser
 
-import twitter  # pip install python-twitter
 import gender_guesser.detector as gender  # pip install gender-guesser
-from requests_oauthlib import OAuth1Session
+from mastodon import Mastodon  # pip install Mastodon.py
+from requests_oauthlib import OAuth2Session  # pip install requests-oauthlib
 from unidecode import unidecode  # pip install unidecode
 
 if os.path.exists("detector.pickle"):
@@ -266,13 +266,13 @@ def batch(it, size):
         yield it[i : i + size]
 
 
-def get_twitter_api(consumer_key, consumer_secret, oauth_token, oauth_token_secret):
-    return twitter.Api(
-        consumer_key=consumer_key,
-        consumer_secret=consumer_secret,
-        access_token_key=oauth_token,
-        access_token_secret=oauth_token_secret,
-        sleep_on_rate_limit=True,
+def get_mastodon_api(client_id, client_secret, access_token, access_token_secret, api_base_url="https://mastodon.social"):
+    return Mastodon(
+        client_id=client_id,
+        client_secret=client_secret,
+        access_token=access_token,
+        access_token_secret=access_token_secret,
+        api_base_url=api_base_url
     )
 
 
@@ -285,16 +285,16 @@ MAX_USERS_LOOKUP_CALLS = 30
 
 
 def get_friends_lists(
-    user_id, consumer_key, consumer_secret, oauth_token, oauth_token_secret
+    user_id, client_id, client_secret, access_token, access_token_secret, api_base_url
 ):
-    api = get_twitter_api(
-        consumer_key, consumer_secret, oauth_token, oauth_token_secret
+    api = get_mastodon_api(
+        client_id, client_secret, access_token, access_token_secret, api_base_url
     )
 
     # Only store what we need, avoid oversized session cookie.
     def process_lists():
-        for l in reversed(api.GetLists()):
-            as_dict = l.AsDict()
+        for list in reversed(api.GetLists()):
+            as_dict = list.AsDict()
             yield {"id": as_dict.get("id"), "name": as_dict.get("name")}
 
     return list(process_lists())
@@ -431,65 +431,50 @@ def analyze_my_timeline(user_id, api, cache):
         newdict[ids] = analyze_users(users, ids_fetched=len(outdict.get(ids)))
     return newdict
 
+def get_access_token(client_id, client_secret, instance_name):
+    AUTHORIZATION_URL = f"https://{instance_name}/oauth/authorize"
+    TOKEN_URL = f"https://{instance_name}/oauth/token"
+    REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
 
-# From https://github.com/bear/python-twitter/blob/master/get_access_token.py
-def get_access_token(consumer_key, consumer_secret):
-    REQUEST_TOKEN_URL = "https://api.twitter.com/oauth/request_token"
-    ACCESS_TOKEN_URL = "https://api.twitter.com/oauth/access_token"
-    AUTHORIZATION_URL = "https://api.twitter.com/oauth/authorize"
-
-    oauth_client = OAuth1Session(
-        consumer_key, client_secret=consumer_secret, callback_uri="oob"
+    oauth_client = OAuth2Session(
+        client_id, redirect_uri=REDIRECT_URI, scope=['read']
     )
 
-    print("\nRequesting temp token from Twitter...\n")
-
-    try:
-        resp = oauth_client.fetch_request_token(REQUEST_TOKEN_URL)
-    except ValueError as e:
-        raise ValueError(
-            "Invalid response from Twitter requesting temp token: {0}".format(e)
-        )
-
-    url = oauth_client.authorization_url(AUTHORIZATION_URL)
-
+    print("\nAuthorizing on Mastodon...\n")
+    url, state = oauth_client.authorization_url(AUTHORIZATION_URL)
     print(
-        "I will try to start a browser to visit the following Twitter page "
+        "I will try to start a browser to visit the following Mastodon page "
         "if a browser will not start, copy the URL to your browser "
         "and retrieve the pincode to be used "
         "in the next step to obtaining an Authentication Token: \n"
-        "\n\t{0}".format(url)
+        f"\n\t{url}\n"
     )
-
     webbrowser.open(url)
-    pincode = input("\nEnter your pincode? ")
 
     print("\nGenerating and signing request for an access token...\n")
 
-    oauth_client = OAuth1Session(
-        consumer_key,
-        client_secret=consumer_secret,
-        resource_owner_key=resp.get("oauth_token"),
-        resource_owner_secret=resp.get("oauth_token_secret"),
-        verifier=pincode,
+    resp = input("Enter the full callback URL after authorization: ")
+
+    token = oauth_client.fetch_token(
+        TOKEN_URL,
+        authorization_response=resp,
+        client_secret=client_secret,
     )
-    try:
-        resp = oauth_client.fetch_access_token(ACCESS_TOKEN_URL)
-    except ValueError as e:
-        msg = ("Invalid response from Twitter requesting " "temp token: {0}").format(e)
-        raise ValueError(msg)
+
     #
     # print('''Your tokens/keys are as follows:
-    #     consumer_key         = {ck}
-    #     consumer_secret      = {cs}
+    #     client_id         = {ck}
+    #     client_secret      = {cs}
     #     access_token_key     = {atk}
     #     access_token_secret  = {ats}'''.format(
-    #     ck=consumer_key,
-    #     cs=consumer_secret,
-    #     atk=resp.get('oauth_token'),
-    #     ats=resp.get('oauth_token_secret')))
+    #     ck=client_id,
+    #     cs=client_secret,
+    #     atk=resp.get('access_token'),
+    #     ats=resp.get('access_token_secret')))
 
-    return resp.get("oauth_token"), resp.get("oauth_token_secret")
+    print(f"\nYour access token is: {token['access_token']}")
+
+    return token['access_token']
 
 
 if __name__ == "__main__":
@@ -508,22 +493,26 @@ if __name__ == "__main__":
     args = p.parse_args()
     [user_id] = args.user_id
 
-    consumer_key = os.environ.get("CONSUMER_KEY") or input("Enter your consumer key: ")
+    client_id = os.environ.get("CONSUMER_KEY") or input("Enter your consumer key: ")
 
-    consumer_secret = os.environ.get("CONSUMER_SECRET") or input(
+    client_secret = os.environ.get("CONSUMER_SECRET") or input(
         "Enter your consumer secret: "
+    )
+
+    base_url = os.environ.get("INSTANCE_URL") or input(
+        "Enter your instance url: "
     )
 
     if args.dry_run:
         tok, tok_secret = None, None
     else:
-        tok, tok_secret = get_access_token(consumer_key, consumer_secret)
+        tok, tok_secret = get_access_token(client_id, client_secret)
 
     if args.self:
         if args.dry_run:
             g, declared = "male", True
         else:
-            api = get_twitter_api(consumer_key, consumer_secret, tok, tok_secret)
+            api = get_mastodon_api(client_id, client_secret, tok, tok_secret, base_url)
             g, declared = analyze_self(user_id, api)
 
         print("{} ({})".format(g, "declared pronoun" if declared else "guess"))
@@ -540,7 +529,7 @@ if __name__ == "__main__":
     if args.dry_run:
         friends, followers, timeline = dry_run_analysis()
     else:
-        api = get_twitter_api(consumer_key, consumer_secret, tok, tok_secret)
+        api = get_mastodon_api(client_id, client_secret, tok, tok_secret, base_url)
         friends = analyze_friends(user_id, None, api, cache)
         followers = analyze_followers(user_id, api, cache)
         timeline = analyze_timeline(user_id, None, api, cache)

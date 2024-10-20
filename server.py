@@ -1,62 +1,74 @@
 import logging
 import os
 
-from authlib.integrations.flask_client import OAuth, OAuthError
-from flask import Flask, flash, redirect, render_template, request, session, url_for
-from wtforms import Form, StringField, SelectField
+from authlib.integrations.flask_client import OAuth, OAuthError  # pip install Authlib
+from flask import (  # pip install Flask
+    Flask,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+from wtforms import Form, SelectField, StringField  # pip install WTForms
 
 from analyze import (
+    Cache,
     analyze_followers,
     analyze_friends,
     analyze_timeline,
-    Cache,
     div,
     dry_run_analysis,
     get_friends_lists,
-    get_twitter_api,
+    get_mastodon_api,
 )
 
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-CONSUMER_KEY = os.environ.get("CONSUMER_KEY")
-CONSUMER_SECRET = os.environ.get("CONSUMER_SECRET")
+CLIENT_ID = os.environ.get("CLIENT_ID")
+CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
+INSTANCE_URL = os.environ.get("INSTANCE_URL")
 TRACKING_ID = os.environ.get("TRACKING_ID")
 
-if not (CONSUMER_KEY and CONSUMER_SECRET):
-    raise ValueError("Must set CONSUMER_KEY and CONSUMER_SECRET environment variables")
+if not (CLIENT_ID and CLIENT_SECRET and INSTANCE_URL):
+    raise ValueError("Must set CLIENT_ID, CLIENT_SECRET and INSTANCE_URL environment variables")
 
-app = Flask("twitter-gender-proportion")
+app = Flask("mastodon-gender-proportion")
 app.config["SECRET_KEY"] = os.environ["COOKIE_SECRET"]
 app.config["DRY_RUN"] = False
-app.config["TWITTER_CLIENT_ID"] = CONSUMER_KEY
-app.config["TWITTER_CLIENT_SECRET"] = CONSUMER_SECRET
+app.config["MASTODON_CLIENT_ID"] = CLIENT_ID
+app.config["MASTODON_CLIENT_SECRET"] = CLIENT_SECRET
+app.config["MASTODON_INSTANCE"] = INSTANCE_URL
 
 oauth = OAuth(app)
 oauth.register(
-    name="twitter",
-    api_base_url="https://api.twitter.com/1.1/",
-    request_token_url="https://api.twitter.com/oauth/request_token",
-    access_token_url="https://api.twitter.com/oauth/access_token",
-    authorize_url="https://api.twitter.com/oauth/authenticate",
+    name="mastodon",
+    api_base_url="https://"+INSTANCE_URL+"/api/v1",
+    access_token_url="https://"+INSTANCE_URL+"/outh/token",
+    authorize_url="https://"+INSTANCE_URL+"/oauth/authenticate",
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    client_kwargs={
+        "scope": "read",
+    },
     fetch_token=lambda: session.get("token"),  # DON'T DO IT IN PRODUCTION
-    consumer_key=CONSUMER_KEY,
-    consumer_secret=CONSUMER_SECRET,
 )
 
-twitter = oauth.twitter
+mastodon = oauth.mastodon
 
 
 @app.route("/login")
 def login():
     redirect_uri = url_for("oauth_authorized", _external=True)
-    return oauth.twitter.authorize_redirect(redirect_uri)
+    return oauth.mastodon.authorize_redirect(redirect_uri)
 
 
 @app.route("/logout")
 def logout():
-    session.pop("twitter_token")
-    session.pop("twitter_user")
+    session.pop("mastodon_token")
+    session.pop("mastodon_user")
     flash("Logged out.")
     return redirect("/")
 
@@ -69,16 +81,16 @@ def handle_error(error):
 
 @app.route("/authorized")
 def oauth_authorized():
-    token = oauth.twitter.authorize_access_token()
-    resp = oauth.twitter.get("account/verify_credentials.json")
+    token = oauth.mastodon.authorize_access_token()
+    resp = oauth.mastodon.get("account/verify_credentials.json")
     profile = resp.json()
-    session["twitter_token"] = (token["oauth_token"], token["oauth_token_secret"])
-    session["twitter_user"] = profile["screen_name"]
+    session["mastodon_token"] = (token["oauth_token"], token["oauth_token_secret"])
+    session["mastodon_user"] = profile["screen_name"]
     try:
         session["lists"] = get_friends_lists(
             profile["screen_name"],
-            CONSUMER_KEY,
-            CONSUMER_SECRET,
+            CLIENT_ID,
+            CLIENT_SECRET,
             token["oauth_token"],
             token["oauth_token_secret"],
         )
@@ -91,17 +103,17 @@ def oauth_authorized():
 
 
 class AnalyzeForm(Form):
-    user_id = StringField("Twitter User Name")
+    user_id = StringField("Mastodon User Name")
     lst = SelectField("List")
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    oauth_token, oauth_token_secret = session.get("twitter_token", (None, None))
+    oauth_token, oauth_token_secret, base_url = session.get("mastodon_token", (None, None), "https://mastodon.social")
     form = AnalyzeForm(request.form)
     if session.get("lists"):
         form.lst.choices = [("none", "No list")] + [
-            (str(l["id"]), l["name"]) for l in session["lists"]
+            (str(list["id"]), list["name"]) for list in session["lists"]
         ]
     else:
         del form.lst
@@ -110,7 +122,7 @@ def index():
     list_name = list_id = error = None
     if request.method == "POST" and form.validate() and form.user_id.data:
         # Don't show auth'ed user's lists in results for another user.
-        if hasattr(form, "lst") and form.user_id.data != session.get("twitter_user"):
+        if hasattr(form, "lst") and form.user_id.data != session.get("mastodon_user"):
             del form.lst
 
         if app.config["DRY_RUN"]:
@@ -121,12 +133,12 @@ def index():
             if session.get("lists") and form.lst and form.lst.data != "none":
                 list_id = int(form.lst.data)
                 list_name = [
-                    l["name"] for l in session["lists"] if int(l["id"]) == list_id
+                    list["name"] for list in session["lists"] if int(list["id"]) == list_id
                 ][0]
 
             try:
-                api = get_twitter_api(
-                    CONSUMER_KEY, CONSUMER_SECRET, oauth_token, oauth_token_secret
+                api = get_mastodon_api(
+                    CLIENT_ID, CLIENT_SECRET, oauth_token, oauth_token_secret, base_url
                 )
                 cache = Cache()
                 results = {

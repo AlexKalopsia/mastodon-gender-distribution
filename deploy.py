@@ -4,7 +4,7 @@ import os
 
 import requests
 
-my_domain = "www.proporti.onl"
+my_domain = "mastodon.kalopsiagames.com"
 username = "emptysquare"
 
 parser = argparse.ArgumentParser()
@@ -19,13 +19,13 @@ args = parser.parse_args()
 print("Rsync files....")
 os.system(
     "rsync -rv --exclude '*.pyc' *"
-    " emptysquare@ssh.pythonanywhere.com:www.proporti.onl/"
+    " emptysquare@ssh.pythonanywhere.com:mastodon.kalopsiagames.com"
 )
 
 print("Reinstall dependencies....")
 os.system(
     "ssh emptysquare@ssh.pythonanywhere.com"
-    " '~/proporti.onl.venv/bin/pip install -U -r ~/www.proporti.onl/requirements.txt'"
+    " '~/proporti.onl.venv/bin/pip install -U -r ~/mastodon.kalopsiagames.com/requirements.txt'"
 )
 
 print("Restarting....")
