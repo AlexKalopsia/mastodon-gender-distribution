@@ -1,6 +1,9 @@
 Gender Distribution of Mastodon Friends and Followers
 ====================================================
 
+> [!WARNING]  
+> The work is not done yet, so the tool is not currently working.
+
 All the work was originally done by ajdavis on ajdavis/proporti.onl, which was calculating 
 gender distribution on Twitter, before the free API got shut down. 
 I am merely adapting it to work on Mastodon. 
