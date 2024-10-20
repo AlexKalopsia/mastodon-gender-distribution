@@ -29,25 +29,25 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 CLIENT_ID = os.environ.get("CLIENT_ID")
 CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
-INSTANCE_URL = os.environ.get("INSTANCE_URL")
+INSTANCE_NAME = os.environ.get("INSTANCE_NAME")
 TRACKING_ID = os.environ.get("TRACKING_ID")
 
-if not (CLIENT_ID and CLIENT_SECRET and INSTANCE_URL):
-    raise ValueError("Must set CLIENT_ID, CLIENT_SECRET and INSTANCE_URL environment variables")
+if not (CLIENT_ID and CLIENT_SECRET and INSTANCE_NAME):
+    raise ValueError("Must set CLIENT_ID, CLIENT_SECRET and INSTANCE_NAME environment variables")
 
 app = Flask("mastodon-gender-proportion")
 app.config["SECRET_KEY"] = os.environ["COOKIE_SECRET"]
 app.config["DRY_RUN"] = False
 app.config["MASTODON_CLIENT_ID"] = CLIENT_ID
 app.config["MASTODON_CLIENT_SECRET"] = CLIENT_SECRET
-app.config["MASTODON_INSTANCE"] = INSTANCE_URL
+app.config["MASTODON_INSTANCE"] = INSTANCE_NAME
 
 oauth = OAuth(app)
 oauth.register(
     name="mastodon",
-    api_base_url="https://"+INSTANCE_URL+"/api/v1",
-    access_token_url="https://"+INSTANCE_URL+"/outh/token",
-    authorize_url="https://"+INSTANCE_URL+"/oauth/authenticate",
+    api_base_url="https://"+INSTANCE_NAME+"/api/v1",
+    access_token_url="https://"+INSTANCE_NAME+"/outh/token",
+    authorize_url="https://"+INSTANCE_NAME+"/oauth/authenticate",
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     client_kwargs={
@@ -86,6 +86,7 @@ def oauth_authorized():
     profile = resp.json()
     session["mastodon_token"] = (token["oauth_token"], token["oauth_token_secret"])
     session["mastodon_user"] = profile["screen_name"]
+    instance_name="mastodon.social" # TODO: change
     try:
         session["lists"] = get_friends_lists(
             profile["screen_name"],
@@ -93,6 +94,7 @@ def oauth_authorized():
             CLIENT_SECRET,
             token["oauth_token"],
             token["oauth_token_secret"],
+            instance_name,
         )
     except Exception:
         app.logger.exception("Error in get_friends_lists, ignoring")
@@ -103,7 +105,7 @@ def oauth_authorized():
 
 
 class AnalyzeForm(Form):
-    user_id = StringField("Mastodon User Name")
+    user_id = StringField("Mastodon User ID")
     lst = SelectField("List")
 
 

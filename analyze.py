@@ -221,14 +221,14 @@ class Analysis(object):
 
 
 def dry_run_analysis():
-    friends = Analysis(250, 400)
-    friends.nonbinary.n = 10
-    friends.nonbinary.n_declared = 10
-    friends.male.n = 200
-    friends.male.n_declared = 20
-    friends.female.n = 40
-    friends.female.n_declared = 5
-    friends.andy.n = 250
+    following = Analysis(250, 400)
+    following.nonbinary.n = 10
+    following.nonbinary.n_declared = 10
+    following.male.n = 200
+    following.male.n_declared = 20
+    following.female.n = 40
+    following.female.n_declared = 5
+    following.andy.n = 250
 
     followers = Analysis(250, 400)
     followers.nonbinary.n = 10
@@ -248,7 +248,7 @@ def dry_run_analysis():
     timeline.female.n_declared = 5
     timeline.andy.n = 250
 
-    return friends, followers, timeline
+    return following, followers, timeline
 
 
 def analyze_users(users, ids_fetched=None):
@@ -266,89 +266,90 @@ def batch(it, size):
         yield it[i : i + size]
 
 
-def get_mastodon_api(client_id, client_secret, access_token, access_token_secret, api_base_url="https://mastodon.social"):
+def get_mastodon_api(client_id, client_secret, access_token, instance_name="mastodon.social"):
     return Mastodon(
         client_id=client_id,
         client_secret=client_secret,
         access_token=access_token,
-        access_token_secret=access_token_secret,
-        api_base_url=api_base_url
+        api_base_url=f"https://{instance_name}"
     )
 
 
 # 5000 ids per call.
-MAX_GET_FRIEND_IDS_CALLS = 10
+MAX_GET_FOLLOWING_IDS_CALLS = 10
 MAX_GET_FOLLOWER_IDS_CALLS = 10
 
 # 100 users per call.
 MAX_USERS_LOOKUP_CALLS = 30
 
 
-def get_friends_lists(
-    user_id, client_id, client_secret, access_token, access_token_secret, api_base_url
+def get_following_lists(
+    user_id, client_id, client_secret, access_token, access_token_secret, instance_name
 ):
     api = get_mastodon_api(
-        client_id, client_secret, access_token, access_token_secret, api_base_url
+        client_id, client_secret, access_token, access_token_secret, instance_name
     )
 
     # Only store what we need, avoid oversized session cookie.
     def process_lists():
-        for list in reversed(api.GetLists()):
+        for list in reversed(api.account_lists(id=user_id)):
             as_dict = list.AsDict()
             yield {"id": as_dict.get("id"), "name": as_dict.get("name")}
 
     return list(process_lists())
 
 
-def analyze_self(user_id, api):
-    users = api.UsersLookup(screen_name=[user_id])
-
-    return analyze_user(users[0])
+def analyze_self(api):
+    return api.me()
 
 
 def fetch_users(user_ids, api, cache):
     users = []
+    accounts_info = []
     users.extend(cache.UsersLookup(user_ids))
     for ids in batch(cache.UncachedUsers(user_ids), 100):
-        results = api.UsersLookup(ids)
+        # Do here
+        for user_id in user_ids:
+            
+            account_info = api.account(id=user_id)
+            accounts_info.append(account_info)
+
+        results = accounts_info
         cache.AddUsers(results)
         users.extend(results)
 
     return users
 
 
-def analyze_friends(user_id, list_id, api, cache):
-    nxt = -1
-    friend_ids = []
-    for _ in range(MAX_GET_FRIEND_IDS_CALLS):
+def analyze_following(user_id, list_id, api, cache):
+    following_ids = []
+    for _ in range(MAX_GET_FOLLOWING_IDS_CALLS):
         if list_id is not None:
-            nxt, prev, data = api.GetListMembersPaged(list_id=list_id, cursor=nxt)
-            friend_ids.extend([fr.id for fr in data])
+            print(f"LIST {list_id}")
+            data = api.list_accounts(id=list_id)
+            print(data)
+            following_ids.extend([fr.id for fr in data])
         else:
-            nxt, prev, data = api.GetFriendIDsPaged(screen_name=user_id, cursor=nxt)
-
-            friend_ids.extend(data)
-        if nxt == 0 or nxt == prev:
-            break
+            data = api.account_following(id=user_id)
+            print("NO LIST!! GETTING FOLLOWING ACCOUNTS")
+            print(data)
+            following_ids.extend(data)
 
     # We can fetch users' details 100 at a time.
-    if len(friend_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
-        friend_id_sample = random.sample(friend_ids, 100 * MAX_USERS_LOOKUP_CALLS)
+    if len(following_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
+        following_id_sample = random.sample(following_ids, 100 * MAX_USERS_LOOKUP_CALLS)
     else:
-        friend_id_sample = friend_ids
+        following_id_sample = following_ids
 
-    users = fetch_users(friend_id_sample, api, cache)
-    return analyze_users(users, ids_fetched=len(friend_ids))
+    users = fetch_users(following_id_sample, api, cache)
+    return analyze_users(users, ids_fetched=len(following_ids))
 
 
 def analyze_followers(user_id, api, cache):
-    nxt = -1
     follower_ids = []
     for _ in range(MAX_GET_FOLLOWER_IDS_CALLS):
-        nxt, prev, data = api.GetFollowerIDsPaged(screen_name=user_id, cursor=nxt)
+        data = api.account_followers(id=user_id)
         follower_ids.extend(data)
-        if nxt == 0 or nxt == prev:
-            break
 
     # We can fetch users' details 100 at a time.
     if len(follower_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
@@ -363,9 +364,9 @@ def analyze_followers(user_id, api, cache):
 def analyze_timeline(user_id, list_id, api, cache):
     # Timeline-functions are limited to 200 statuses
     if list_id is not None:
-        statuses = api.GetListTimeline(list_id=list_id, count=200)
+        statuses = api.timeline_list(id=list_id, limit=200)
     else:
-        statuses = api.GetHomeTimeline(count=200)
+        statuses = api.timeline_home(limit=200)
 
     timeline_ids = []
     for s in statuses:
@@ -381,13 +382,11 @@ def analyze_timeline(user_id, list_id, api, cache):
 
 def analyze_my_timeline(user_id, api, cache):
     # Timeline-functions are limited to 200 statuses
-    statuses = api.GetUserTimeline(
-        screen_name=user_id,
-        count=200,
-        include_rts=True,
-        trim_user=False,
-        exclude_replies=False,
+    statuses = api.timeline (
+        limit=200,
     )
+    print("MY STATUSES")
+    print(statuses)
     max_id = 0
     # Max 2000 tweets.
     for i in range(1, 10):
@@ -395,34 +394,27 @@ def analyze_my_timeline(user_id, api, cache):
             # Already fetched all tweets in timeline.
             break
         max_id = statuses[-1].id - 1
-        statuses = statuses + api.GetUserTimeline(
-            screen_name=user_id,
-            count=200,
-            max_id=max_id,
-            include_rts=True,
-            trim_user=False,
-            exclude_replies=False,
+        statuses = statuses + api.timeline(
+            limit=200,
+            max_id=max_id
         )
-    retweet_ids = []
+    boost_ids = []
     reply_ids = []
-    quotes_ids = []
     timeline_ids = []
     for s in statuses:
+        print(s)
         if s.retweeted_status is not None:
-            retweet_ids.append(s.retweeted_status.user.id)
+            boost_ids.append(s.retweeted_status.user.id)
         elif s.in_reply_to_status_id is not None:
             for i in s.user_mentions:
                 reply_ids.append(i.id)
-        elif s.quoted_status is not None:
-            quotes_ids.append(s.quoted_status.user.id)
         elif len(s.user_mentions) > 0:
             for i in s.user_mentions:
                 timeline_ids.append(i.id)
 
     outdict = {
-        "retweets": retweet_ids,
+        "boosts": boost_ids,
         "replies": reply_ids,
-        "quotes": quotes_ids,
         "mentions": timeline_ids,
     }
     newdict = {}
@@ -461,6 +453,8 @@ def get_access_token(client_id, client_secret, instance_name):
         client_secret=client_secret,
     )
 
+    print(token)
+
     #
     # print('''Your tokens/keys are as follows:
     #     client_id         = {ck}
@@ -482,7 +476,7 @@ if __name__ == "__main__":
 
     p = argparse.ArgumentParser(
         description="Estimate gender distribution of "
-        "Twitter friends, followers and"
+        "Mastodon following accounts, followers and"
         "your timeline"
     )
     p.add_argument("user_id", nargs=1)
@@ -493,27 +487,27 @@ if __name__ == "__main__":
     args = p.parse_args()
     [user_id] = args.user_id
 
-    client_id = os.environ.get("CONSUMER_KEY") or input("Enter your consumer key: ")
+    client_id = os.environ.get("CLIENT_ID") or input("Enter your client id: ") # TODO: check client key/id
 
-    client_secret = os.environ.get("CONSUMER_SECRET") or input(
-        "Enter your consumer secret: "
+    client_secret = os.environ.get("CLIENT_SECRET") or input(
+        "Enter your client secret: "
     )
 
-    base_url = os.environ.get("INSTANCE_URL") or input(
-        "Enter your instance url: "
+    instance_name = os.environ.get("INSTANCE_NAME") or input(
+        "Enter your instance name: "
     )
 
     if args.dry_run:
-        tok, tok_secret = None, None
+        tok = None
     else:
-        tok, tok_secret = get_access_token(client_id, client_secret)
+        tok = get_access_token(client_id, client_secret, instance_name)
 
     if args.self:
         if args.dry_run:
             g, declared = "male", True
         else:
-            api = get_mastodon_api(client_id, client_secret, tok, tok_secret, base_url)
-            g, declared = analyze_self(user_id, api)
+            api = get_mastodon_api(client_id, client_secret, tok, instance_name)
+            g, declared = analyze_self(api)
 
         print("{} ({})".format(g, "declared pronoun" if declared else "guess"))
         sys.exit()
@@ -527,27 +521,25 @@ if __name__ == "__main__":
     start = time.time()
     cache = Cache()
     if args.dry_run:
-        friends, followers, timeline = dry_run_analysis()
+        following, followers, timeline = dry_run_analysis()
     else:
-        api = get_mastodon_api(client_id, client_secret, tok, tok_secret, base_url)
-        friends = analyze_friends(user_id, None, api, cache)
+        api = get_mastodon_api(client_id, client_secret, tok, instance_name)
+        following = analyze_following(user_id, None, api, cache)
         followers = analyze_followers(user_id, api, cache)
         timeline = analyze_timeline(user_id, None, api, cache)
         mytimeline = analyze_my_timeline(user_id, api, cache)
-        retweets = mytimeline.get("retweets")
+        boosts = mytimeline.get("boosts")
         replies = mytimeline.get("replies")
-        quotes = mytimeline.get("quotes")
         mentions = mytimeline.get("mentions")
 
     duration = time.time() - start
 
     for user_type, an in [
-        ("friends", friends),
+        ("following", following),
         ("followers", followers),
         ("timeline", timeline),
-        ("retweets", retweets),
+        ("boosts", boosts),
         ("replies", replies),
-        ("quotes", quotes),
         ("mentions", mentions),
     ]:
         nb, men, women, andy = an.nonbinary.n, an.male.n, an.female.n, an.andy.n
