@@ -8,7 +8,10 @@ import warnings
 import webbrowser
 
 import gender_guesser.detector as gender  # pip install gender-guesser
-from mastodon import Mastodon  # pip install Mastodon.py
+from mastodon import (  # pip install Mastodon.py
+    Mastodon,
+    MastodonServiceUnavailableError,
+)
 from requests_oauthlib import OAuth2Session  # pip install requests-oauthlib
 from unidecode import unidecode  # pip install unidecode
 
@@ -91,16 +94,23 @@ class Cache(object):
 
     @property
     def hit_percentage(self):
-        return (100 * self._hits) / (self._hits + self._misses)
+        total_requests = self._hits + self._misses
+        if total_requests == 0:
+            return 0
+        return (100 * self._hits) / total_requests
 
     def UsersLookup(self, user_ids):
+
+        user_ids = [uid.id if hasattr(uid, 'id') else uid for uid in user_ids]
+
         rv = [self._users[uid] for uid in user_ids if uid in self._users]
         self._hits += len(rv)
         self._misses += len(user_ids) - len(rv)
         return rv
 
     def UncachedUsers(self, user_ids):
-        return list(set(user_ids) - set(self._users))
+        user_id_values = {uid['id'] if isinstance(uid, dict) and 'id' in uid else uid for uid in user_ids}
+        return list(user_id_values  - set(self._users))
 
     def AddUsers(self, profiles):
         for p in profiles:
@@ -134,20 +144,20 @@ def analyze_user(user, verbose=False):
     with warnings.catch_warnings():
         # Suppress unidecode warning "Surrogate character will be ignored".
         warnings.filterwarnings("ignore")
-        g = declared_gender(user.description)
+        g = declared_gender(user.note)
         if g != "andy":
             return g, True
 
         # We haven't found a preferred pronoun.
         for name, country in [
-            (split(user.name), "usa"),
-            (user.name, "usa"),
-            (split(unidecode(user.name)), "usa"),
-            (unidecode(user.name), "usa"),
-            (split(user.name), None),
-            (user.name, None),
-            (unidecode(user.name), None),
-            (split(unidecode(user.name)), None),
+            (split(user.display_name), "usa"),
+            (user.display_name, "usa"),
+            (split(unidecode(user.display_name)), "usa"),
+            (unidecode(user.display_name), "usa"),
+            (split(user.display_name), None),
+            (user.display_name, None),
+            (unidecode(user.display_name), None),
+            (split(unidecode(user.display_name)), None),
         ]:
             g = detector.get_gender(name, country)
             if g != "andy":
@@ -162,7 +172,7 @@ def analyze_user(user, verbose=False):
         if verbose:
             print(
                 "{:20s}\t{:40s}\t{:s}".format(
-                    user.screen_name.encode("utf-8"), user.name.encode("utf-8"), g
+                    user.username.encode("utf-8"), user.display_name.encode("utf-8"), g
                 )
             )
 
@@ -248,7 +258,37 @@ def dry_run_analysis():
     timeline.female.n_declared = 5
     timeline.andy.n = 250
 
-    return following, followers, timeline
+    boosts = Analysis(250, 400)
+    boosts.nonbinary.n = 10
+    boosts.nonbinary.n_declared = 10
+    boosts.male.n = 200
+    boosts.male.n_declared = 20
+    boosts.female.n = 40
+    boosts.female.n_declared = 5
+    boosts.andy.n = 250
+
+    replies = Analysis(250, 400)
+    replies.nonbinary.n = 10
+    replies.nonbinary.n_declared = 10
+    replies.male.n = 200
+    replies.male.n_declared = 20
+    replies.female.n = 40
+    replies.female.n_declared = 5
+    replies.andy.n = 250
+
+    mentions = Analysis(250, 400)
+    mentions.nonbinary.n = 10
+    mentions.nonbinary.n_declared = 10
+    mentions.male.n = 200
+    mentions.male.n_declared = 20
+    mentions.female.n = 40
+    mentions.female.n_declared = 5
+    mentions.andy.n = 250
+
+
+
+
+    return following, followers, timeline, boosts, replies, mentions
 
 
 def analyze_users(users, ids_fetched=None):
@@ -294,7 +334,7 @@ def get_following_lists(
     def process_lists():
         for list in reversed(api.account_lists(id=user_id)):
             as_dict = list.AsDict()
-            yield {"id": as_dict.get("id"), "name": as_dict.get("name")}
+            yield {"id": as_dict.get("id"), "name": as_dict.get("display_name")}
 
     return list(process_lists())
 
@@ -303,16 +343,16 @@ def analyze_self(api):
     return api.me()
 
 
-def fetch_users(user_ids, api, cache):
+def fetch_users(user_ids, api, cache, retries=3):
     users = []
     accounts_info = []
     users.extend(cache.UsersLookup(user_ids))
     for ids in batch(cache.UncachedUsers(user_ids), 100):
-        # Do here
+        results = []
         for user_id in user_ids:
-            
-            account_info = api.account(id=user_id)
-            accounts_info.append(account_info)
+            account_info = fetch_account_with_retry(user_id, api, retries)
+            if account_info:
+                accounts_info.append(account_info)
 
         results = accounts_info
         cache.AddUsers(results)
@@ -320,19 +360,25 @@ def fetch_users(user_ids, api, cache):
 
     return users
 
+def fetch_account_with_retry(user_id, api, retries=3):
+    for i in range(retries):
+        try:
+            return api.account(id=user_id)
+        except MastodonServiceUnavailableError:
+            print(f"Service unavailable for user {user_id}, retrying in {2 ** i} seconds...")
+            time.sleep(2 ** i)
+    print(f"Failed to fetch account info for user {user_id} after {retries} retries.")
+    return None
+
 
 def analyze_following(user_id, list_id, api, cache):
     following_ids = []
     for _ in range(MAX_GET_FOLLOWING_IDS_CALLS):
         if list_id is not None:
-            print(f"LIST {list_id}")
             data = api.list_accounts(id=list_id)
-            print(data)
             following_ids.extend([fr.id for fr in data])
         else:
             data = api.account_following(id=user_id)
-            print("NO LIST!! GETTING FOLLOWING ACCOUNTS")
-            print(data)
             following_ids.extend(data)
 
     # We can fetch users' details 100 at a time.
@@ -370,9 +416,9 @@ def analyze_timeline(user_id, list_id, api, cache):
 
     timeline_ids = []
     for s in statuses:
-        # Skip the current user's own tweets.
-        if s.user.screen_name != user_id:
-            timeline_ids.append(s.user.id)
+        # Skip the current user's own toots.
+        if s.account.id != user_id:
+            timeline_ids.append(s.account.id)
 
     # Reduce to unique list of ids
     timeline_ids = list(set(timeline_ids))
@@ -380,40 +426,42 @@ def analyze_timeline(user_id, list_id, api, cache):
     return analyze_users(users, ids_fetched=len(timeline_ids))
 
 
-def analyze_my_timeline(user_id, api, cache):
+def analyze_my_timeline(api, cache):
     # Timeline-functions are limited to 200 statuses
     statuses = api.timeline (
         limit=200,
     )
-    print("MY STATUSES")
-    print(statuses)
     max_id = 0
-    # Max 2000 tweets.
+    # Max 2000 toots, 200 at a time.
     for i in range(1, 10):
         if max_id == statuses[-1].id - 1:
-            # Already fetched all tweets in timeline.
+            # Already fetched all toots in timeline.
             break
         max_id = statuses[-1].id - 1
-        statuses = statuses + api.timeline(
-            limit=200,
-            max_id=max_id
-        )
-    boost_ids = []
+        try:
+            statuses = statuses + api.timeline(
+                limit=200,
+                max_id=max_id
+            )
+        except api.errors.MastodonAPIError as e:
+            print(f"Error: {e}")
+            print(f"Status Code: {e.response.status_code}, Reason: {e.response.reason}")
+        
+    reblog_ids = []
     reply_ids = []
     timeline_ids = []
     for s in statuses:
-        print(s)
-        if s.retweeted_status is not None:
-            boost_ids.append(s.retweeted_status.user.id)
-        elif s.in_reply_to_status_id is not None:
-            for i in s.user_mentions:
+        if s.reblog is not None:
+            reblog_ids.append(s.reblog.account.id)
+        elif s.in_reply_to_id is not None:
+            for i in s.mentions:
                 reply_ids.append(i.id)
-        elif len(s.user_mentions) > 0:
-            for i in s.user_mentions:
+        elif len(s.mentions) > 0:
+            for i in s.mentions:
                 timeline_ids.append(i.id)
 
     outdict = {
-        "boosts": boost_ids,
+        "boosts": reblog_ids,
         "replies": reply_ids,
         "mentions": timeline_ids,
     }
@@ -435,25 +483,29 @@ def get_access_token(client_id, client_secret, instance_name):
     print("\nAuthorizing on Mastodon...\n")
     url, state = oauth_client.authorization_url(AUTHORIZATION_URL)
     print(
-        "I will try to start a browser to visit the following Mastodon page "
-        "if a browser will not start, copy the URL to your browser "
-        "and retrieve the pincode to be used "
+        "I will try to start a browser to visit the following Mastodon page."
+        "\nIf a browser does not start, copy the URL to your browser, "
+        "accept the request, and retrieve the pincode to be used "
         "in the next step to obtaining an Authentication Token: \n"
         f"\n\t{url}\n"
     )
     webbrowser.open(url)
+    code = input("Enter yout authentication code: ")
 
     print("\nGenerating and signing request for an access token...\n")
 
-    resp = input("Enter the full callback URL after authorization: ")
 
-    token = oauth_client.fetch_token(
-        TOKEN_URL,
-        authorization_response=resp,
-        client_secret=client_secret,
-    )
+    resp = f"https://{instance_name}/oauth/authorize/native?code={code}"
 
-    print(token)
+    try:
+        token = oauth_client.fetch_token(
+            TOKEN_URL,
+            authorization_response=resp,
+            client_secret=client_secret,
+        )
+    except ValueError as e:
+        msg = ("Invalid response from Mastodon requesting " "temp token: {0}").format(e)
+        raise ValueError(msg)
 
     #
     # print('''Your tokens/keys are as follows:
@@ -466,7 +518,7 @@ def get_access_token(client_id, client_secret, instance_name):
     #     atk=resp.get('access_token'),
     #     ats=resp.get('access_token_secret')))
 
-    print(f"\nYour access token is: {token['access_token']}")
+    print(f"\nAccess Token: {token['access_token']}")
 
     return token['access_token']
 
@@ -487,7 +539,8 @@ if __name__ == "__main__":
     args = p.parse_args()
     [user_id] = args.user_id
 
-    client_id = os.environ.get("CLIENT_ID") or input("Enter your client id: ") # TODO: check client key/id
+    client_id = os.environ.get("CLIENT_ID") or input(
+        "Enter your client key: ") # TODO: check client key/id
 
     client_secret = os.environ.get("CLIENT_SECRET") or input(
         "Enter your client secret: "
@@ -521,13 +574,13 @@ if __name__ == "__main__":
     start = time.time()
     cache = Cache()
     if args.dry_run:
-        following, followers, timeline = dry_run_analysis()
+        following, followers, timeline, boosts, replies, mentions = dry_run_analysis()
     else:
         api = get_mastodon_api(client_id, client_secret, tok, instance_name)
         following = analyze_following(user_id, None, api, cache)
         followers = analyze_followers(user_id, api, cache)
         timeline = analyze_timeline(user_id, None, api, cache)
-        mytimeline = analyze_my_timeline(user_id, api, cache)
+        mytimeline = analyze_my_timeline(api, cache)
         boosts = mytimeline.get("boosts")
         replies = mytimeline.get("replies")
         mentions = mytimeline.get("mentions")
@@ -568,6 +621,7 @@ if __name__ == "__main__":
                 an.declared("female"),
             )
         )
+        print("\n")
 
     print("")
     print(

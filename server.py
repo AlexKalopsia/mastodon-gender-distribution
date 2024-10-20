@@ -111,7 +111,8 @@ class AnalyzeForm(Form):
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    oauth_token, oauth_token_secret, base_url = session.get("mastodon_token", (None, None), "https://mastodon.social")
+    oauth_token, oauth_token_secret, base_url = session.get(
+        "mastodon_token", (None, None), "https://mastodon.social")
     form = AnalyzeForm(request.form)
     if session.get("lists"):
         form.lst.choices = [("none", "No list")] + [
