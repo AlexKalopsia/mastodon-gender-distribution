@@ -7,13 +7,13 @@ import time
 import warnings
 import webbrowser
 
-import gender_guesser.detector as gender  # pip install gender-guesser
-from mastodon import (  # pip install Mastodon.py
+import gender_guesser.detector as gender
+from mastodon import (
     Mastodon,
     MastodonServiceUnavailableError,
 )
 from requests_oauthlib import OAuth2Session  # pip install requests-oauthlib
-from unidecode import unidecode  # pip install unidecode
+from unidecode import unidecode
 
 if os.path.exists("detector.pickle"):
     detector = pickle.load(open("detector.pickle", "rb"))

@@ -1,6 +1,7 @@
 Authlib
 flask
 gender-guesser
+Mastodon.py
 requests
 unidecode
 WTForms
