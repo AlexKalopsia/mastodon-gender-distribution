@@ -3,5 +3,6 @@ flask
 gender-guesser
 Mastodon.py
 requests
+requests-oauthlib
 unidecode
 WTForms
