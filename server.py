@@ -25,6 +25,8 @@ from analyze import (
     get_user_id_from_handle,
 )
 
+print("Current Working Directory:", os.getcwd())
+
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
