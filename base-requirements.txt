@@ -1,6 +1,7 @@
 Authlib
 flask
 gender-guesser
+gunicorn
 Mastodon.py
 requests
 requests-oauthlib
