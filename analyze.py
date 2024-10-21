@@ -109,7 +109,10 @@ class Cache(object):
         return rv
 
     def UncachedUsers(self, user_ids):
-        user_id_values = {uid['id'] if isinstance(uid, dict) and 'id' in uid else uid for uid in user_ids}
+        user_id_values = {
+            uid['id'] if isinstance(uid, dict) and 'id' in uid else uid 
+            for uid in user_ids
+        }
         return list(user_id_values  - set(self._users))
 
     def AddUsers(self, profiles):
@@ -363,7 +366,10 @@ def fetch_account_with_retry(user_id, api, retries=3):
         try:
             return api.account(id=user_id)
         except MastodonServiceUnavailableError:
-            print(f"Service unavailable for user {user_id}, retrying in {2 ** i} seconds...")
+            print(
+                f"Service unavailable for user {user_id}, "
+                f"retrying in {2 ** i} seconds..."
+            )
             time.sleep(2 ** i)
     print(f"Failed to fetch account info for user {user_id} after {retries} retries.")
     return None

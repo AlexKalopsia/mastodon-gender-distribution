@@ -34,7 +34,8 @@ INSTANCE = os.environ.get("INSTANCE")
 TRACKING_ID = os.environ.get("TRACKING_ID")
 
 if not (CLIENT_KEY and CLIENT_SECRET and INSTANCE):
-    raise ValueError("Must set CLIENT_KEY, CLIENT_SECRET and INSTANCE environment variables")
+    raise ValueError(
+        "Must set CLIENT_KEY, CLIENT_SECRET and INSTANCE environment variables")
 
 app = Flask("mastodon-gender-proportion")
 app.config["SECRET_KEY"] = os.environ["COOKIE_SECRET"]
@@ -146,7 +147,9 @@ def index():
             if session.get("lists") and form.lst and form.lst.data != "none":
                 list_id = int(form.lst.data)
                 list_name = [
-                    list["name"] for list in session["lists"] if int(list["id"]) == list_id
+                    list["name"] 
+                    for list in session["lists"] 
+                    if int(list["id"]) == list_id
                 ][0]
 
             try:

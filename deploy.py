@@ -25,7 +25,8 @@ os.system(
 print("Reinstall dependencies....")
 os.system(
     "ssh emptysquare@ssh.pythonanywhere.com"
-    " '~/proporti.onl.venv/bin/pip install -U -r ~/mastodon.kalopsiagames.com/requirements.txt'"
+    " '~/proporti.onl.venv/bin/pip install -U -r "
+    "~/mastodon.kalopsiagames.com/requirements.txt'"
 )
 
 print("Restarting....")
