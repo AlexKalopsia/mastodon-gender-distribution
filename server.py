@@ -101,9 +101,7 @@ def oauth_authorized():
     instance="mastodon.social" # TODO: change
     try:
         session["lists"] = get_following_lists(
-            profile["display_name"],
-            CLIENT_KEY,
-            CLIENT_SECRET,
+            profile["id"],
             token["access_token"],
             instance,
         )

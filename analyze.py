@@ -1,3 +1,4 @@
+import logging
 import os
 import pickle
 import random
@@ -10,7 +11,6 @@ import webbrowser
 import gender_guesser.detector as gender
 from mastodon import (
     Mastodon,
-    MastodonServiceUnavailableError,
 )
 from requests_oauthlib import OAuth2Session  # pip install requests-oauthlib
 from unidecode import unidecode
@@ -354,6 +354,10 @@ def fetch_users(user_ids, api, cache, retries=3):
             account_info = fetch_account_with_retry(user_id, api, retries)
             if account_info:
                 accounts_info.append(account_info)
+            else:
+                logging.error(
+                    f"Could not retrieve account info for user {user_id}, continuing..."
+                )
 
         results = accounts_info
         cache.AddUsers(results)
@@ -362,18 +366,19 @@ def fetch_users(user_ids, api, cache, retries=3):
     return users
 
 def fetch_account_with_retry(user_id, api, retries=3):
-    for i in range(retries):
+    for attempt in range(retries):
         try:
             return api.account(id=user_id)
-        except MastodonServiceUnavailableError:
-            print(
-                f"Service unavailable for user {user_id}, "
-                f"retrying in {2 ** i} seconds..."
-            )
-            time.sleep(2 ** i)
-    print(f"Failed to fetch account info for user {user_id} after {retries} retries.")
-    return None
-
+        except Exception as e:
+            logging.warning(f"Attempt {attempt + 1} failed: {e}")
+            if attempt < retries - 1:
+                time.sleep(1)
+            else:
+                logging.error(
+                    f"Failed to fetch account for user {user_id} "
+                    f"after {retries} attempts."
+                )
+                return None
 
 def analyze_following(user_id, list_id, api, cache):
     following_ids = []
