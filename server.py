@@ -25,10 +25,11 @@ from analyze import (
     get_user_id_from_handle,
 )
 
-print("Current Working Directory:", os.getcwd())
-
+logging.basicConfig(filename='debug.log', level=logging.DEBUG)
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+logging.debug("Current Working Directory:", os.getcwd())
 
 CLIENT_KEY = os.environ.get("CLIENT_KEY")
 CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
