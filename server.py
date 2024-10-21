@@ -189,9 +189,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("port", nargs=1, type=int)
+    parser.add_argument("port", nargs="?", type=int)
     args = parser.parse_args()
-    [port] = args.port
+
+    if args.port is None:
+        port = int(os.environ.get("PORT", 8000))
+    else:
+        port = args.port
 
     app.config["DRY_RUN"] = args.dry_run
     app.run(port=port, debug=args.debug)
