@@ -74,8 +74,8 @@ td.td-first-col {
     var button = document.getElementById("analyze-button");
     button.disabled = true;
 
-    var user_id = document.getElementById("user_id");
-    user_id.readOnly = true;
+    var acct = document.getElementById("acct");
+    acct.readOnly = true;
 
     var text = document.getElementById("analyze-button-text");
     text.style.display = 'none';
@@ -94,7 +94,7 @@ td.td-first-col {
   }
 
   document.addEventListener('DOMContentLoaded', function() {
-    var userid = document.getElementById("user_id");
+    var userid = document.getElementById("acct");
     var lst = document.getElementById("lst");
     if (userid === null || lst === null) {
       // Not logged in to Mastodon.
@@ -135,7 +135,7 @@ td.td-first-col {
     <h1 class="lead">Estimate the gender distribution of your followers and those you follow,<br>
       based on their profile descriptions or first names.</h1>
     <p><a href="https://www.theguardian.com/technology/2016/oct/04/twitter-women-gender-elon-musk-tim-cook">Many tech leaders follow mostly men</a>, but I want to follow a diverse group of people.</p>
-    <p>I have forked ajdavis' excellent <a href="https://github.com/ajdavis/twitter-gender-distribution/">Twitter Gender Distribution</a> tool, adapted it to work with Mastodon, and <a href="https://github.com/AlexKalopsia/mastodon-gender-distribution"></a>put it on GitHub</a>. It's inaccurate and it undercounts nonbinary folk, but it's better than making no effort at all.
+    <p>I have forked ajdavis' excellent <a href="https://github.com/ajdavis/twitter-gender-distribution/">Twitter Gender Distribution</a> tool, adapted it to work with Mastodon, and <a href="https://github.com/AlexKalopsia/mastodon-gender-distribution">put it on GitHub</a>. It's inaccurate and it undercounts nonbinary folk, but it's better than making no effort at all.
     </p>
     <p>I want you to be able to do this, too. Estimate the distribution of those you follow and see if there's room to improve!</p>
     <hr>
@@ -146,11 +146,11 @@ td.td-first-col {
       <hr>
       <form method="post" onsubmit="return analyze_click()">
         <div class="form-group">
-          <label for="user_id">Mastodon User:</label>
+          <label for="acct">Mastodon User:</label>
           <div class="input-group col-xs-4">
             <span class="input-group-addon">@</span>
-            <input type="text" class="form-control" name="user_id" id="user_id"
-              value="{{ form.user_id.data|default(session.mastodon_user, true) }}">
+            <input type="text" class="form-control" name="acct" id="acct"
+              value="{{ form.acct.data|default(session.mastodon_user, true) }}">
           </div>
           {% if form.lst %}
             <label for="lst">List:</label>
@@ -161,7 +161,7 @@ td.td-first-col {
         </div>
         <button id="analyze-button" type="submit" class="btn btn-primary">
           <span id="analyze-loading" style="display: none;">
-            <span class="glyphicon glyphicon-refresh spinning"></span> Loading (this can take up to a minute) </span>
+            <span class="glyphicon glyphicon-refresh spinning"></span> Loading (this can take several minutes) </span>
           <span id="analyze-button-text" >Analyze</span>
         </button>
       </form>
@@ -175,9 +175,9 @@ td.td-first-col {
     {% endif %}
 
     {% if results %}
-      <h2>Results for @{{ form.user_id.data }}</h2>
+      <h2>Results for @{{ form.acct.data }}</h2>
       <p>
-        Sampled {{ results.friends.ids_sampled }} people @{{ form.user_id.data }} follows{% if list_name %} in list "{{ list_name }}"{% endif %}, {{ results.followers.ids_sampled }} followers and {{ results.timeline.ids_sampled }} users from the latest 200 toots in @{{ form.user_id.data }}&#39;s timeline.
+        Sampled {{ results.friends.ids_sampled }} people @{{ form.acct.data }} follows{% if list_name %} in list "{{ list_name }}"{% endif %}, {{ results.followers.ids_sampled }} followers and {{ results.timeline.ids_sampled }} users from the latest 200 toots in @{{ form.acct.data }}&#39;s timeline.
         Gender estimate based on {{ results.friends.declared() + results.followers.declared() + results.timeline.declared() }} Mastodon bios with declared pronouns like "she/her" and {{ results.friends.guessed() + results.followers.guessed() + results.timeline.guessed() }} genders guessed from first names.
       </p>
       <table class="table" style="table-layout: fixed; white-space: nowrap">
@@ -207,7 +207,7 @@ td.td-first-col {
   <div class="row">
     <div class="col-md-8 col-md-offset-1">
       <div style="color: #9f9f9f; margin-top: 1.5em">
-        <p>You must log in to prevent Mastodon from rate-limiting this tool. I access only your public information, and nothing is stored.</p>
+        <p>I access only your public information, and nothing is stored.</p>
         {% if session.get('mastodon_user') %}
           <p>To completely deauthorize this application with Mastodon, visit <a style="color: #9f9f9f" href="https://mastodon.social/oauth/authorized_applications">Your Account Settings</a>.</p>
         {% endif %}

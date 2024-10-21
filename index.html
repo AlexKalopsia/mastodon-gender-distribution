@@ -59,8 +59,8 @@ td.td-first-col {
     var button = document.getElementById("analyze-button");
     button.disabled = true;
 
-    var user_id = document.getElementById("user_id");
-    user_id.readOnly = true;
+    var acct = document.getElementById("acct");
+    acct.readOnly = true;
 
     var text = document.getElementById("analyze-button-text");
     text.style.display = 'none';
@@ -79,7 +79,7 @@ td.td-first-col {
   }
 
   document.addEventListener('DOMContentLoaded', function() {
-    var userid = document.getElementById("user_id");
+    var userid = document.getElementById("acct");
     var lst = document.getElementById("lst");
     if (userid === null || lst === null) {
       // Not logged in to Mastodon.
@@ -106,7 +106,7 @@ td.td-first-col {
     <h1 class="lead">Estimate the gender distribution of your followers and those you follow,<br>
       based on their profile descriptions or first names.</h1>
     <p><a href="https://www.theguardian.com/technology/2016/oct/04/twitter-women-gender-elon-musk-tim-cook">Many tech leaders follow mostly men</a>, but I want to follow a diverse group of people.</p>
-    <p>I have adapted ajdavis' excellent <a href="https://github.com/ajdavis/twitter-gender-distribution/">Twitter Gender Distribution</a> tool, adapted it to work with Mastodon, and put it on GitHub</a>. It's inaccurate and it undercounts nonbinary folk, but it's better than making no effort at all.
+    <p>I have adapted ajdavis' excellent <a href="https://github.com/ajdavis/twitter-gender-distribution/">Twitter Gender Distribution</a> tool, adapted it to work with Mastodon, and <a href="https://github.com/AlexKalopsia/mastodon-gender-distribution">put it on GitHub</a>. It's inaccurate and it undercounts nonbinary folk, but it's better than making no effort at all.
     </p>
     <p>I want you to be able to do this, too. Estimate the distribution of those you follow and see if there's room to improve!</p>
     <hr>
@@ -124,7 +124,7 @@ td.td-first-col {
   <div class="row">
     <div class="col-md-8 col-md-offset-1">
       <div style="color: #9f9f9f; margin-top: 1.5em">
-        <p>You must log in to prevent Mastodon from rate-limiting this tool. I access only your public information, and nothing is stored.</p>
+        <p>I access only your public information, and nothing is stored.</p>
 
       </div>
       <h5><a href="https://emptysqua.re/blog/gender-of-twitter-users-i-follow/">About the algorithm.</a></h5>

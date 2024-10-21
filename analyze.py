@@ -306,12 +306,10 @@ def batch(it, size):
         yield it[i : i + size]
 
 
-def get_mastodon_api(client_id, client_secret, access_token, instance_name="mastodon.social"):
+def get_mastodon_api(access_token, instance="mastodon.social"):
     return Mastodon(
-        client_id=client_id,
-        client_secret=client_secret,
         access_token=access_token,
-        api_base_url=f"https://{instance_name}"
+        api_base_url=f"https://{instance}"
     )
 
 
@@ -324,10 +322,10 @@ MAX_USERS_LOOKUP_CALLS = 30
 
 
 def get_following_lists(
-    user_id, client_id, client_secret, access_token, access_token_secret, instance_name
+    user_id, access_token, instance
 ):
     api = get_mastodon_api(
-        client_id, client_secret, access_token, access_token_secret, instance_name
+        access_token, instance
     )
 
     # Only store what we need, avoid oversized session cookie.
@@ -340,7 +338,7 @@ def get_following_lists(
 
 
 def analyze_self(api):
-    return api.me()
+    return analyze_user(api.me())
 
 
 def fetch_users(user_ids, api, cache, retries=3):
@@ -471,9 +469,9 @@ def analyze_my_timeline(api, cache):
         newdict[ids] = analyze_users(users, ids_fetched=len(outdict.get(ids)))
     return newdict
 
-def get_access_token(client_id, client_secret, instance_name):
-    AUTHORIZATION_URL = f"https://{instance_name}/oauth/authorize"
-    TOKEN_URL = f"https://{instance_name}/oauth/token"
+def get_access_token(client_id, client_secret, instance):
+    AUTHORIZATION_URL = f"https://{instance}/oauth/authorize"
+    TOKEN_URL = f"https://{instance}/oauth/token"
     REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
 
     oauth_client = OAuth2Session(
@@ -490,12 +488,12 @@ def get_access_token(client_id, client_secret, instance_name):
         f"\n\t{url}\n"
     )
     webbrowser.open(url)
-    code = input("Enter yout authentication code: ")
+    code = input("Enter yout authorization code: ")
 
     print("\nGenerating and signing request for an access token...\n")
 
 
-    resp = f"https://{instance_name}/oauth/authorize/native?code={code}"
+    resp = f"https://{instance}/oauth/authorize/native?code={code}"
 
     try:
         token = oauth_client.fetch_token(
@@ -522,6 +520,25 @@ def get_access_token(client_id, client_secret, instance_name):
 
     return token['access_token']
 
+def parse_mastodon_handle(handle):
+    handle = handle.lstrip('@')
+    if '@' in handle:
+        username, instance = handle.split('@', 1)
+    else:
+        username = handle
+        instance = None
+
+    return username, instance
+
+def get_user_id_from_handle(api, handle):
+    accounts = api.account_search(handle, limit=1)
+
+    if accounts:
+        account = accounts[0]
+        return account.id
+    else:
+        return None
+
 
 if __name__ == "__main__":
     import argparse
@@ -531,35 +548,38 @@ if __name__ == "__main__":
         "Mastodon following accounts, followers and"
         "your timeline"
     )
-    p.add_argument("user_id", nargs=1)
+    p.add_argument("user_handle", nargs=1)
     p.add_argument(
         "--self", help="perform gender analysis on user_id itself", action="store_true"
     )
     p.add_argument("--dry-run", help="fake results", action="store_true")
     args = p.parse_args()
-    [user_id] = args.user_id
+    [user_handle] = args.user_handle
 
-    client_id = os.environ.get("CLIENT_ID") or input(
+    username, instance = parse_mastodon_handle(user_handle)
+
+    client_id = os.environ.get("CLIENT_KEY") or input(
         "Enter your client key: ") # TODO: check client key/id
 
     client_secret = os.environ.get("CLIENT_SECRET") or input(
         "Enter your client secret: "
     )
 
-    instance_name = os.environ.get("INSTANCE_NAME") or input(
-        "Enter your instance name: "
-    )
+    if instance is None:
+        instance = input(
+            "Enter your Mastodon instance: "
+        )
 
     if args.dry_run:
         tok = None
     else:
-        tok = get_access_token(client_id, client_secret, instance_name)
+        tok = get_access_token(client_id, client_secret, instance)    
 
     if args.self:
         if args.dry_run:
             g, declared = "male", True
         else:
-            api = get_mastodon_api(client_id, client_secret, tok, instance_name)
+            api = get_mastodon_api(tok, instance)
             g, declared = analyze_self(api)
 
         print("{} ({})".format(g, "declared pronoun" if declared else "guess"))
@@ -576,7 +596,8 @@ if __name__ == "__main__":
     if args.dry_run:
         following, followers, timeline, boosts, replies, mentions = dry_run_analysis()
     else:
-        api = get_mastodon_api(client_id, client_secret, tok, instance_name)
+        api = get_mastodon_api(tok, instance)
+        user_id = api.me().id
         following = analyze_following(user_id, None, api, cache)
         followers = analyze_followers(user_id, api, cache)
         timeline = analyze_timeline(user_id, None, api, cache)

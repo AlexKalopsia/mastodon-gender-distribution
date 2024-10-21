@@ -16,39 +16,40 @@ from wtforms import Form, SelectField, StringField  # pip install WTForms
 from analyze import (
     Cache,
     analyze_followers,
-    analyze_friends,
+    analyze_following,
     analyze_timeline,
     div,
     dry_run_analysis,
-    get_friends_lists,
+    get_following_lists,
     get_mastodon_api,
+    get_user_id_from_handle,
 )
 
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-CLIENT_ID = os.environ.get("CLIENT_ID")
+CLIENT_KEY = os.environ.get("CLIENT_KEY")
 CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
-INSTANCE_NAME = os.environ.get("INSTANCE_NAME")
+INSTANCE = os.environ.get("INSTANCE")
 TRACKING_ID = os.environ.get("TRACKING_ID")
 
-if not (CLIENT_ID and CLIENT_SECRET and INSTANCE_NAME):
-    raise ValueError("Must set CLIENT_ID, CLIENT_SECRET and INSTANCE_NAME environment variables")
+if not (CLIENT_KEY and CLIENT_SECRET and INSTANCE):
+    raise ValueError("Must set CLIENT_KEY, CLIENT_SECRET and INSTANCE environment variables")
 
 app = Flask("mastodon-gender-proportion")
 app.config["SECRET_KEY"] = os.environ["COOKIE_SECRET"]
 app.config["DRY_RUN"] = False
-app.config["MASTODON_CLIENT_ID"] = CLIENT_ID
+app.config["MASTODON_CLIENT_ID"] = CLIENT_KEY
 app.config["MASTODON_CLIENT_SECRET"] = CLIENT_SECRET
-app.config["MASTODON_INSTANCE"] = INSTANCE_NAME
+app.config["MASTODON_INSTANCE"] = INSTANCE
 
 oauth = OAuth(app)
 oauth.register(
     name="mastodon",
-    api_base_url="https://"+INSTANCE_NAME+"/api/v1",
-    access_token_url="https://"+INSTANCE_NAME+"/outh/token",
-    authorize_url="https://"+INSTANCE_NAME+"/oauth/authenticate",
-    client_id=CLIENT_ID,
+    api_base_url="https://"+INSTANCE+"/api/v1",
+    access_token_url="https://"+INSTANCE+"/oauth/token",
+    authorize_url="https://"+INSTANCE+"/oauth/authorize",
+    client_id=CLIENT_KEY,
     client_secret=CLIENT_SECRET,
     client_kwargs={
         "scope": "read",
@@ -82,37 +83,46 @@ def handle_error(error):
 @app.route("/authorized")
 def oauth_authorized():
     token = oauth.mastodon.authorize_access_token()
-    resp = oauth.mastodon.get("account/verify_credentials.json")
-    profile = resp.json()
-    session["mastodon_token"] = (token["oauth_token"], token["oauth_token_secret"])
-    session["mastodon_user"] = profile["screen_name"]
-    instance_name="mastodon.social" # TODO: change
+    resp = oauth.mastodon.get(f"https://{INSTANCE}/api/v1/accounts/verify_credentials")
+    print("Response status:", resp.status_code)
+    print("Response text:", resp.text)
+
     try:
-        session["lists"] = get_friends_lists(
-            profile["screen_name"],
-            CLIENT_ID,
+        profile = resp.json()
+        print(profile)
+    except ValueError as e:
+        print("JSON decode error:", e)
+        return "Failed to decode JSON response"
+        
+    print(token)
+    session["mastodon_token"] = token["access_token"]
+    session["mastodon_user"] = profile["acct"]
+    instance="mastodon.social" # TODO: change
+    try:
+        session["lists"] = get_following_lists(
+            profile["display_name"],
+            CLIENT_KEY,
             CLIENT_SECRET,
-            token["oauth_token"],
-            token["oauth_token_secret"],
-            instance_name,
+            token["access_token"],
+            instance,
         )
     except Exception:
         app.logger.exception("Error in get_friends_lists, ignoring")
         session["lists"] = []
 
-    flash("You were signed in as %s" % profile["screen_name"])
+    flash("You were signed in as %s" % profile["display_name"])
     return redirect("/")
 
 
 class AnalyzeForm(Form):
-    user_id = StringField("Mastodon User ID")
+    acct = StringField("Mastodon User")
     lst = SelectField("List")
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    oauth_token, oauth_token_secret, base_url = session.get(
-        "mastodon_token", (None, None), "https://mastodon.social")
+    tok = session.get(
+        "mastodon_token")
     form = AnalyzeForm(request.form)
     if session.get("lists"):
         form.lst.choices = [("none", "No list")] + [
@@ -123,9 +133,9 @@ def index():
 
     results = {}
     list_name = list_id = error = None
-    if request.method == "POST" and form.validate() and form.user_id.data:
+    if request.method == "POST" and form.validate() and form.acct.data:
         # Don't show auth'ed user's lists in results for another user.
-        if hasattr(form, "lst") and form.user_id.data != session.get("mastodon_user"):
+        if hasattr(form, "lst") and form.acct.data != session.get("mastodon_user"):
             del form.lst
 
         if app.config["DRY_RUN"]:
@@ -141,14 +151,16 @@ def index():
 
             try:
                 api = get_mastodon_api(
-                    CLIENT_ID, CLIENT_SECRET, oauth_token, oauth_token_secret, base_url
+                    tok, INSTANCE
                 )
                 cache = Cache()
+
+                user_id = get_user_id_from_handle(api, form.acct.data)
                 results = {
-                    "friends": analyze_friends(form.user_id.data, list_id, api, cache),
-                    "followers": analyze_followers(form.user_id.data, api, cache),
+                    "friends": analyze_following(user_id, list_id, api, cache),
+                    "followers": analyze_followers(user_id, api, cache),
                     "timeline": analyze_timeline(
-                        form.user_id.data, list_id, api, cache
+                        user_id, list_id, api, cache
                     ),
                 }
             except Exception as exc:
