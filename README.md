@@ -2,13 +2,11 @@ Gender Distribution of Mastodon Friends and Followers
 ====================================================
 
 > [!WARNING]  
-> The work is not done yet, so the tool is currently not working.
+> The original Twitter tool was done by ajdavis on [ajdavis/proporti.onl](https://github.com/ajdavis/proporti.onl),
+> before the free API got shut down.\
+> I adapted it to work with Mastodon. 
 
-All the work was originally done by ajdavis on [ajdavis/proporti.onl](https://github.com/ajdavis/proporti.onl), which was calculating 
-gender distribution on Twitter, before the free API got shut down. 
-I am merely adapting it to work on Mastodon. 
-
-This tool guesses the gender of your friends and followers by looking in
+This tool guesses the gender of your following account and followers by looking in
 their Mastodon bios for pronoun announcements like "she/her", or else guessing
 based on first name.
 
@@ -27,10 +25,11 @@ python3 -m pip install -r requirements.txt
 Command-line Use
 ----------------
 
-Pass a Mastodon username to analyze the user's friends and followers:
+Pass a Mastodon user handle to analyze the user's friends and followers.\
+It supports formats such as `alexkalopsia`, `@alexkalopsia`, `@alexkalopsia@mastodon.social` and `alexkalopsia@mastodon.social`:
 
 ```
-python3 analyze.py jessejiryudavis
+python3 analyze.py alexkalopsia
 ```
 
 Test
@@ -47,6 +46,13 @@ Website
 
 Start a Flask server for testing:
 
+Linux
 ```
-CONSUMER_KEY=foo CONSUMER_SECRET=bar COOKIE_SECRET=baz python3 server.py 8000
+CLIENT_KEY=foo CLIENT_SECRET=bar COOKIE_SECRET=baz INSTANCE=mastodon.social python3 server.py 8000
+```
+
+Windows
+```
+$env:CLIENT_KEY="foo"; $env:CLIENT_SECRET="bar"; $env:COOKIE_SECRET="baz"; $env:INSTANCE="mastodon.social"; py 
+server.py 8000
 ```
