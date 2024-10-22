@@ -95,7 +95,6 @@ def oauth_authorized():
         print("JSON decode error:", e)
         return "Failed to decode JSON response"
         
-    print(token)
     session["mastodon_token"] = token["access_token"]
     session["mastodon_user"] = profile["acct"]
     instance="mastodon.social" # TODO: change

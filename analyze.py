@@ -343,42 +343,27 @@ def get_following_lists(
 def analyze_self(api):
     return analyze_user(api.me())
 
-
-def fetch_users(user_ids, api, cache, retries=3):
+def fetch_users(user_ids, api, cache):
     users = []
-    accounts_info = []
     users.extend(cache.UsersLookup(user_ids))
-    for ids in batch(cache.UncachedUsers(user_ids), 100):
+    for ids in batch(cache.UncachedUsers(user_ids), 40):
         results = []
-        for user_id in user_ids:
-            account_info = fetch_account_with_retry(user_id, api, retries)
-            if account_info:
-                accounts_info.append(account_info)
-            else:
-                logging.error(
-                    f"Could not retrieve account info for user {user_id}, continuing..."
-                )
+        accounts = api.accounts(ids=ids)
+        print("PROPORTIONAL ACCOUNTS:")
+        print(accounts[-5:])
+        if accounts:
+            accounts.append(accounts)
+        else:
+            logging.error(
+                "Could not retrieve accounts from list, continuing..."
+            ) 
 
-        results = accounts_info
+        results = accounts
+
         cache.AddUsers(results)
         users.extend(results)
 
-    return users
-
-def fetch_account_with_retry(user_id, api, retries=3):
-    for attempt in range(retries):
-        try:
-            return api.account(id=user_id)
-        except Exception as e:
-            logging.warning(f"Attempt {attempt + 1} failed: {e}")
-            if attempt < retries - 1:
-                time.sleep(1)
-            else:
-                logging.error(
-                    f"Failed to fetch account for user {user_id} "
-                    f"after {retries} attempts."
-                )
-                return None
+    return users 
 
 def analyze_following(user_id, list_id, api, cache):
     following_ids = []
