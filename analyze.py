@@ -345,20 +345,23 @@ def analyze_self(api):
 
 def fetch_users(user_ids, api, cache):
     users = []
+    accounts_info = []
+    # Add cached users
     users.extend(cache.UsersLookup(user_ids))
+
+    # Batch of uncached users
     for ids in batch(cache.UncachedUsers(user_ids), 40):
         results = []
         accounts = api.accounts(ids=ids)
-        print("PROPORTIONAL ACCOUNTS:")
-        print(accounts[-5:])
         if accounts:
-            accounts.append(accounts)
+            for account in accounts:
+                accounts_info.append(account)
         else:
             logging.error(
                 "Could not retrieve accounts from list, continuing..."
             ) 
 
-        results = accounts
+        results = accounts_info
 
         cache.AddUsers(results)
         users.extend(results)
