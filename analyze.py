@@ -131,6 +131,7 @@ class Cache(object):
         for user in users:
             self._users[user.id] = user
 
+        #print(self._users)
 
 def declared_gender(description):
     dl = description.lower()
@@ -344,6 +345,8 @@ MAX_GET_FOLLOWER_IDS_CALLS = 10
 # 100 users per call.
 MAX_USERS_LOOKUP_CALLS = 30
 
+MAX_TIMELINE_CALLS = 10
+
 
 def get_following_lists(
     user_id, access_token, instance
@@ -369,8 +372,10 @@ def fetch_users(user_ids, api, cache):
 
     # Batch of uncached users
     new_users = []
-    for ids in batch(cache.UncachedUsers(user_ids), 100):
+    for ids in batch(cache.UncachedUsers(user_ids), 40):
         results = api.accounts(ids=ids)
+        # [{'id: 1, 'username': 'Gargron' ...}]
+        
         for account in results:
             new_users.append(account)
 
@@ -384,16 +389,13 @@ def analyze_following(user_id, list_id, api, cache):
     max_id = None
 
     for _ in range(MAX_GET_FOLLOWING_IDS_CALLS):
-        try:
-            accounts = (
-                api.list_accounts(id=list_id, max_id=max_id) if list_id is not None
-                else api.account_following(id=user_id, max_id=max_id)
-            )
-            if max_id == accounts[-1].id - 1:
-                break
-        except api.errors.MastodonAPIError as e:
-            print(f"Error: {e}")
-            print(f"Status Code: {e.response.status_code}, Reason: {e.response.reason}")
+        if list_id is not None:
+            accounts = api.list_accounts(id=list_id, max_id=max_id)
+        else:
+            accounts = api.account_following(id=user_id, max_id=max_id)
+
+        if max_id == accounts[-1].id - 1:
+            break
 
         following_ids.extend([account.id for account in accounts])
         max_id = accounts[-1].id - 1
@@ -413,13 +415,9 @@ def analyze_followers(user_id, api, cache):
     max_id = None
 
     for _ in range(MAX_GET_FOLLOWER_IDS_CALLS):
-        try:
-            accounts = api.account_followers(id=user_id, max_id=max_id)
-            follower_ids.extend([account.id for account in accounts])
-            max_id = accounts[-1].id - 1
-        except api.errors.MastodonAPIError as e:
-            print(f"Error: {e}")
-            print(f"Status Code: {e.response.status_code}, Reason: {e.response.reason}")
+        accounts = api.account_followers(id=user_id, max_id=max_id)
+        follower_ids.extend([account.id for account in accounts])
+        max_id = accounts[-1].id - 1
 
     # We can fetch users' details 100 at a time.
     if len(follower_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
@@ -430,45 +428,52 @@ def analyze_followers(user_id, api, cache):
     users = fetch_users(follower_ids_sample, api, cache)
     return analyze_users(users, ids_fetched=len(follower_ids))
 
-
+"""
+Analyze the timeline containing the user's following and followers' toots
+"""
 def analyze_timeline(user_id, list_id, api, cache):
     # Timeline-functions are limited to 40 statuses
-    if list_id is not None:
-        statuses = api.timeline_list(id=list_id, limit=40)
-    else:
-        statuses = api.timeline_home(limit=40)
-
     timeline_ids = []
-    for s in statuses:
-        # Skip the current user's own toots.
-        if s.account.id != user_id:
-            timeline_ids.append(s.account.id)
+    max_id = None
+
+    # Max 400 toots, 40 at a time.
+    for _ in range(MAX_TIMELINE_CALLS):
+        if list_id is not None:
+            statuses = api.timeline_list(id=list_id, max_id=max_id, limit=40)
+        else:
+            statuses = api.timeline_home(max_id=max_id, limit=40)
+
+        if max_id == statuses[-1].id - 1:
+            break        
+
+        for s in statuses:
+            # Skip the current user's own toots.
+            if s.account.id != user_id:
+                timeline_ids.append(s.account.id)
 
     # Reduce to unique list of ids
     timeline_ids = list(set(timeline_ids))
     users = fetch_users(timeline_ids, api, cache)
     return analyze_users(users, ids_fetched=len(timeline_ids))
 
-
-def analyze_my_timeline(api, cache):
+"""
+Analyze the timeline containing the user's own toots.
+This method is never called when deploying the server. 
+"""
+def analyze_my_timeline(user_id, api, cache):
     # Timeline-functions are limited to 40 statuses
     statuses = api.timeline(limit=40)
     max_id = None
+
     # Max 400 toots, 40 at a time.
-    for i in range(1, 10):
+    for _ in range(1, MAX_TIMELINE_CALLS):
+
         if max_id == statuses[-1].id - 1:
-            # Already fetched all toots in timeline.
             break
+
         max_id = statuses[-1].id - 1
-        try:
-            statuses += api.timeline(
-                limit=40,
-                max_id=max_id
-            )
-        except api.errors.MastodonAPIError as e:
-            print(f"Error: {e}")
-            print(f"Status Code: {e.response.status_code}, Reason: {e.response.reason}")
-        
+        statuses += api.timeline(limit=40, max_id=max_id)    
+
     reblog_ids = []
     reply_ids = []
     timeline_ids = []
@@ -625,7 +630,7 @@ if __name__ == "__main__":
         following = analyze_following(user_id, None, api, cache)
         followers = analyze_followers(user_id, api, cache)
         timeline = analyze_timeline(user_id, None, api, cache)
-        mytimeline = analyze_my_timeline(api, cache)
+        mytimeline = analyze_my_timeline(user_id, api, cache)
         boosts = mytimeline.get("boosts")
         replies = mytimeline.get("replies")
         mentions = mytimeline.get("mentions")
