@@ -148,12 +148,15 @@ def analyze_user(user, verbose=False):
         # Suppress unidecode warning "Surrogate character will be ignored".
         warnings.filterwarnings("ignore")
 
-        # Look for information in bio and custom fields
-        user_note = user.note
-        user_fields = " ".join(
-            field['value'] for field in user.fields if 'value' in field)
+        # Look for explicit Pronouns field, otherwise check bio
+        pronouns_field = next((
+            field['value'] for field in user.fields 
+            if field.get('name') == "Pronouns"),
+            None
+        )
+        description = pronouns_field if pronouns_field is not None else user.note
+        g = declared_gender(description)
 
-        g = declared_gender(f"{user_note} {user_fields}")
         if g != "andy":
             return g, True
 
