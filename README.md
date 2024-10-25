@@ -1,4 +1,4 @@
-Gender Distribution of Mastodon Friends and Followers
+Gender Distribution of Mastodon Connections and Followers
 ====================================================
 
 > [!WARNING]  
@@ -25,7 +25,7 @@ python3 -m pip install -r requirements.txt
 Command-line Use
 ----------------
 
-Pass a Mastodon user handle to analyze the user's friends and followers.\
+Pass a Mastodon user handle to analyze the accounts the user follows and their followers.\
 It supports formats such as `alexkalopsia`, `@alexkalopsia`, `@alexkalopsia@mastodon.social` and `alexkalopsia@mastodon.social`:
 
 ```

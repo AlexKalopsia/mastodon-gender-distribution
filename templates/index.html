@@ -4,7 +4,7 @@
         href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css"
         integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7"
         crossorigin="anonymous">
-<title>Mastodon Proport: Gender distribution of People You Follow and Followers on Mastodon</title>
+<title>Mastodon Proportional: Gender distribution of your followers and those you follow</title>
 <link rel="shortcut icon" href="//static/favicon.png" type="image/png" />
 <style type="text/css">
 /* override Bootstrap */
@@ -133,7 +133,7 @@ td.td-first-col {
 
     <h1>Mastodon Proport<span style="letter-spacing: -0.02em">i</span><span style="color: #b4b4b4; letter-spacing: -0.06em"">.</span>onl</h1>
     <h1 class="lead">Estimate the gender distribution of your followers and those you follow,<br>
-      based on their profile descriptions or first names.</h1>
+      based on their profile names, bios, and extra fields.</h1>
     <p><a href="https://www.theguardian.com/technology/2016/oct/04/twitter-women-gender-elon-musk-tim-cook">Many tech leaders follow mostly men</a>, but I want to follow a diverse group of people.</p>
     <p>I have forked ajdavis' excellent <a href="https://github.com/ajdavis/twitter-gender-distribution/">Twitter Gender Distribution</a> tool, adapted it to work with Mastodon, and <a href="https://github.com/AlexKalopsia/mastodon-gender-distribution">put it on GitHub</a>. It's inaccurate and it undercounts nonbinary folk, but it's better than making no effort at all.
     </p>
@@ -177,8 +177,8 @@ td.td-first-col {
     {% if results %}
       <h2>Results for @{{ form.acct.data }}</h2>
       <p>
-        Sampled {{ results.friends.ids_sampled }} people @{{ form.acct.data }} follows{% if list_name %} in list "{{ list_name }}"{% endif %}, {{ results.followers.ids_sampled }} followers and {{ results.timeline.ids_sampled }} users from the latest 200 toots in @{{ form.acct.data }}&#39;s timeline.
-        Gender estimate based on {{ results.friends.declared() + results.followers.declared() + results.timeline.declared() }} Mastodon bios with declared pronouns like "she/her" and {{ results.friends.guessed() + results.followers.guessed() + results.timeline.guessed() }} genders guessed from first names.
+        Sampled {{ results.following.ids_sampled }} people @{{ form.acct.data }} follows{% if list_name %} in list "{{ list_name }}"{% endif %}, {{ results.followers.ids_sampled }} followers and {{ results.timeline.ids_sampled }} users from the latest 200 toots in @{{ form.acct.data }}&#39;s timeline.
+        Gender estimate based on {{ results.following.declared() + results.followers.declared() + results.timeline.declared() }} Mastodon bios and fields with declared pronouns like "she/her" and {{ results.following.guessed() + results.followers.guessed() + results.timeline.guessed() }} genders guessed from first names.
       </p>
       <table class="table" style="table-layout: fixed; white-space: nowrap">
         <thead><tr>
@@ -188,7 +188,7 @@ td.td-first-col {
           <th class="col-md-1">women</th>
           <th class="col-md-1" style="font-weight: normal">no gender,<br>unknown</th>
         </tr></thead>
-        {% for user_type, users in [('People you follow', results.friends), ('Followers', results.followers), ('Timeline', results.timeline)] %}
+        {% for user_type, users in [('People you follow', results.following), ('Followers', results.followers), ('Timeline', results.timeline)] %}
         <tr>
           <td class="td-first-col">{{ user_type }}</td>
           <td class="td-important">{{ users.pct('nonbinary')|round|int }}%</td>

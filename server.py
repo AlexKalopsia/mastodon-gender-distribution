@@ -105,7 +105,7 @@ def oauth_authorized():
             instance,
         )
     except Exception:
-        app.logger.exception("Error in get_friends_lists, ignoring")
+        app.logger.exception("Error in get_following_lists, ignoring")
         session["lists"] = []
 
     flash("You were signed in as %s" % profile["display_name"])
@@ -138,8 +138,8 @@ def index():
 
         if app.config["DRY_RUN"]:
             list_name = None
-            friends, followers, timeline = dry_run_analysis()
-            results = {"friends": friends, "followers": followers, "timeline": timeline}
+            following, followers, timeline = dry_run_analysis()
+            results = {"following": following, "followers": followers, "timeline": timeline}
         else:
             if session.get("lists") and form.lst and form.lst.data != "none":
                 list_id = int(form.lst.data)
@@ -157,7 +157,7 @@ def index():
 
                 user_id = get_user_id_from_handle(api, form.acct.data)
                 results = {
-                    "friends": analyze_following(user_id, list_id, api, cache),
+                    "following": analyze_following(user_id, list_id, api, cache),
                     "followers": analyze_followers(user_id, api, cache),
                     "timeline": analyze_timeline(
                         user_id, list_id, api, cache

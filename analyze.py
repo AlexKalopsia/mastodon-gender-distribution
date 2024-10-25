@@ -359,8 +359,9 @@ def fetch_users(user_ids, api, cache):
     users.extend(cache.UsersLookup(user_ids))
 
     # Batch of uncached users
-    for ids in batch(cache.UncachedUsers(user_ids), 40):
+    for ids in batch(cache.UncachedUsers(user_ids), 100):
         results = []
+        print("Requesting accounts for IDs:", ids)
         accounts = api.accounts(ids=ids)
         if accounts:
             for account in accounts:
@@ -399,9 +400,19 @@ def analyze_following(user_id, list_id, api, cache):
 
 def analyze_followers(user_id, api, cache):
     follower_ids = []
+    max_id = None
+
     for _ in range(MAX_GET_FOLLOWER_IDS_CALLS):
-        data = api.account_followers(id=user_id)
-        follower_ids.extend(data)
+
+        try:
+            data = api.account_followers(id=user_id, max_id=max_id, limit=80)
+            if not data:
+                break
+            follower_ids.extend(data)
+            max_id = data[-1].id - 1
+        except api.errors.MastodonAPIError as e:
+            print(f"Error: {e}")
+            print(f"Status Code: {e.response.status_code}, Reason: {e.response.reason}")
 
     # We can fetch users' details 100 at a time.
     if len(follower_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
@@ -414,11 +425,11 @@ def analyze_followers(user_id, api, cache):
 
 
 def analyze_timeline(user_id, list_id, api, cache):
-    # Timeline-functions are limited to 200 statuses
+    # Timeline-functions are limited to 40 statuses
     if list_id is not None:
-        statuses = api.timeline_list(id=list_id, limit=200)
+        statuses = api.timeline_list(id=list_id, limit=40)
     else:
-        statuses = api.timeline_home(limit=200)
+        statuses = api.timeline_home(limit=40)
 
     timeline_ids = []
     for s in statuses:
@@ -433,12 +444,12 @@ def analyze_timeline(user_id, list_id, api, cache):
 
 
 def analyze_my_timeline(api, cache):
-    # Timeline-functions are limited to 200 statuses
+    # Timeline-functions are limited to 40 statuses
     statuses = api.timeline (
-        limit=200,
+        limit=40,
     )
     max_id = 0
-    # Max 2000 toots, 200 at a time.
+    # Max 400 toots, 40 at a time.
     for i in range(1, 10):
         if max_id == statuses[-1].id - 1:
             # Already fetched all toots in timeline.
@@ -446,7 +457,7 @@ def analyze_my_timeline(api, cache):
         max_id = statuses[-1].id - 1
         try:
             statuses = statuses + api.timeline(
-                limit=200,
+                limit=40,
                 max_id=max_id
             )
         except api.errors.MastodonAPIError as e:
