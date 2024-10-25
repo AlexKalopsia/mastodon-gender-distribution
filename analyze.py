@@ -100,24 +100,36 @@ class Cache(object):
         return (100 * self._hits) / total_requests
 
     def UsersLookup(self, user_ids):
-
-        user_ids = [uid.id if hasattr(uid, 'id') else uid for uid in user_ids]
-
-        rv = [self._users[uid] for uid in user_ids if uid in self._users]
-        self._hits += len(rv)
-        self._misses += len(user_ids) - len(rv)
-        return rv
+        """
+        Looks for cached users by their ids
+        """
+        users = [self._users[uid] for uid in user_ids if uid in self._users]
+        self._hits += len(users)
+        self._misses += len(user_ids) - len(users)
+        return users
 
     def UncachedUsers(self, user_ids):
-        user_id_values = {
-            uid['id'] if isinstance(uid, dict) and 'id' in uid else uid 
-            for uid in user_ids
-        }
-        return list(user_id_values  - set(self._users))
+        """
+        Given a list of user IDs, it returns the ones that are not in the cache
 
-    def AddUsers(self, profiles):
-        for p in profiles:
-            self._users[p.id] = p
+        Example:
+            >>> self._users = {108192926138721866: {"username": "alexkalopsia"},
+            109322706099399045: {"username": "jessejiryudavis"}}
+        """
+        uncached_ids = set(user_ids)  - set(self._users)
+        return list(uncached_ids)
+
+
+    def AddUsers(self, users):
+        """
+        Add a list of user objects to the cache, storing each user
+        with a key relative to their id.
+
+        Example:
+            >>> {108192926138721866: {"username": "alexkalopsia"}}
+        """
+        for user in users:
+            self._users[user.id] = user
 
 
 def declared_gender(description):
@@ -336,9 +348,7 @@ MAX_USERS_LOOKUP_CALLS = 30
 def get_following_lists(
     user_id, access_token, instance
 ):
-    api = get_mastodon_api(
-        access_token, instance
-    )
+    api = get_mastodon_api(access_token, instance)
 
     # Only store what we need, avoid oversized session cookie.
     def process_lists():
@@ -354,39 +364,39 @@ def analyze_self(api):
 
 def fetch_users(user_ids, api, cache):
     users = []
-    accounts_info = []
     # Add cached users
     users.extend(cache.UsersLookup(user_ids))
 
     # Batch of uncached users
+    new_users = []
     for ids in batch(cache.UncachedUsers(user_ids), 100):
-        results = []
-        print("Requesting accounts for IDs:", ids)
-        accounts = api.accounts(ids=ids)
-        if accounts:
-            for account in accounts:
-                accounts_info.append(account)
-        else:
-            logging.error(
-                "Could not retrieve accounts from list, continuing..."
-            ) 
+        results = api.accounts(ids=ids)
+        for account in results:
+            new_users.append(account)
 
-        results = accounts_info
-
-        cache.AddUsers(results)
-        users.extend(results)
+    cache.AddUsers(new_users)
+    users.extend(new_users)
 
     return users 
 
 def analyze_following(user_id, list_id, api, cache):
     following_ids = []
+    max_id = None
+
     for _ in range(MAX_GET_FOLLOWING_IDS_CALLS):
-        if list_id is not None:
-            data = api.list_accounts(id=list_id)
-            following_ids.extend([fr.id for fr in data])
-        else:
-            data = api.account_following(id=user_id)
-            following_ids.extend(data)
+        try:
+            accounts = (
+                api.list_accounts(id=list_id, max_id=max_id) if list_id is not None
+                else api.account_following(id=user_id, max_id=max_id)
+            )
+            if max_id == accounts[-1].id - 1:
+                break
+        except api.errors.MastodonAPIError as e:
+            print(f"Error: {e}")
+            print(f"Status Code: {e.response.status_code}, Reason: {e.response.reason}")
+
+        following_ids.extend([account.id for account in accounts])
+        max_id = accounts[-1].id - 1
 
     # We can fetch users' details 100 at a time.
     if len(following_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
@@ -403,24 +413,21 @@ def analyze_followers(user_id, api, cache):
     max_id = None
 
     for _ in range(MAX_GET_FOLLOWER_IDS_CALLS):
-
         try:
-            data = api.account_followers(id=user_id, max_id=max_id, limit=80)
-            if not data:
-                break
-            follower_ids.extend(data)
-            max_id = data[-1].id - 1
+            accounts = api.account_followers(id=user_id, max_id=max_id)
+            follower_ids.extend([account.id for account in accounts])
+            max_id = accounts[-1].id - 1
         except api.errors.MastodonAPIError as e:
             print(f"Error: {e}")
             print(f"Status Code: {e.response.status_code}, Reason: {e.response.reason}")
 
     # We can fetch users' details 100 at a time.
     if len(follower_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
-        follower_id_sample = random.sample(follower_ids, 100 * MAX_USERS_LOOKUP_CALLS)
+        follower_ids_sample = random.sample(follower_ids, 100 * MAX_USERS_LOOKUP_CALLS)
     else:
-        follower_id_sample = follower_ids
+        follower_ids_sample = follower_ids
 
-    users = fetch_users(follower_id_sample, api, cache)
+    users = fetch_users(follower_ids_sample, api, cache)
     return analyze_users(users, ids_fetched=len(follower_ids))
 
 
@@ -445,10 +452,8 @@ def analyze_timeline(user_id, list_id, api, cache):
 
 def analyze_my_timeline(api, cache):
     # Timeline-functions are limited to 40 statuses
-    statuses = api.timeline (
-        limit=40,
-    )
-    max_id = 0
+    statuses = api.timeline(limit=40)
+    max_id = None
     # Max 400 toots, 40 at a time.
     for i in range(1, 10):
         if max_id == statuses[-1].id - 1:
@@ -456,7 +461,7 @@ def analyze_my_timeline(api, cache):
             break
         max_id = statuses[-1].id - 1
         try:
-            statuses = statuses + api.timeline(
+            statuses += api.timeline(
                 limit=40,
                 max_id=max_id
             )
