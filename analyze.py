@@ -147,7 +147,13 @@ def analyze_user(user, verbose=False):
     with warnings.catch_warnings():
         # Suppress unidecode warning "Surrogate character will be ignored".
         warnings.filterwarnings("ignore")
-        g = declared_gender(user.note)
+
+        # Look for information in bio and custom fields
+        user_note = user.note
+        user_fields = " ".join(
+            field['value'] for field in user.fields if 'value' in field)
+
+        g = declared_gender(f"{user_note} {user_fields}")
         if g != "andy":
             return g, True
 
