@@ -615,7 +615,7 @@ if __name__ == "__main__":
     )
     p.add_argument("user_handle", nargs=1)
     p.add_argument(
-        "--self", help="perform gender analysis on user_id itself", action="store_true"
+        "--self", help="perform gender analysis on own user handle", action="store_true"
     )
     p.add_argument("--dry-run", help="fake results", action="store_true")
     args = p.parse_args()
@@ -624,7 +624,7 @@ if __name__ == "__main__":
     username, instance = parse_mastodon_handle(user_handle)
 
     client_id = os.environ.get("CLIENT_KEY") or input(
-        "Enter your client key: ") # TODO: check client key/id
+        "Enter your client key: ")
 
     client_secret = os.environ.get("CLIENT_SECRET") or input(
         "Enter your client secret: "
