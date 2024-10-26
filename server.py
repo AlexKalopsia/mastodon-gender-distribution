@@ -11,6 +11,7 @@ from flask import (  # pip install Flask
     session,
     url_for,
 )
+from mastodon import MastodonNotFoundError
 from wtforms import Form, SelectField, StringField  # pip install WTForms
 
 from analyze import (
@@ -163,11 +164,17 @@ def index():
                         user_id, list_id, api, cache
                     ),
                 }
+                for key, value in results.items():
+                    if not value:
+                        raise Exception("An error has occurred")
             except Exception as exc:
                 import traceback
 
                 traceback.print_exc()
-                error = exc
+                if isinstance(exc, MastodonNotFoundError):
+                    error = f"Could not find user {form.acct.data}."
+                else:
+                    error = exc
 
     return render_template(
         "index.html",

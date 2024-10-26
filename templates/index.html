@@ -172,9 +172,7 @@ td.td-first-col {
     {% if error %}
       <h2>Error</h2>
       <p>{{ error }}</p>
-    {% endif %}
-
-    {% if results %}
+    {% elif results %}
       <h2>Results for @{{ form.acct.data }}</h2>
       <p>
         Sampled {{ results.following.ids_sampled }} people @{{ form.acct.data }} follows{% if list_name %} in list "{{ list_name }}"{% endif %}, {{ results.followers.ids_sampled }} followers and {{ results.timeline.ids_sampled }} users from the latest 200 toots in @{{ form.acct.data }}&#39;s timeline.

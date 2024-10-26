@@ -310,10 +310,9 @@ def dry_run_analysis():
     mentions.female.n_declared = 5
     mentions.andy.n = 250
 
-
-
-
     return following, followers, timeline, boosts, replies, mentions
+
+    
 
 
 def analyze_users(users, ids_fetched=None):
@@ -389,10 +388,18 @@ def analyze_following(user_id, list_id, api, cache):
     max_id = None
 
     for _ in range(MAX_GET_FOLLOWING_IDS_CALLS):
-        if list_id is not None:
-            accounts = api.list_accounts(id=list_id, max_id=max_id)
-        else:
-            accounts = api.account_following(id=user_id, max_id=max_id)
+        try:
+            if list_id is not None:
+                accounts = api.list_accounts(id=list_id, max_id=max_id)
+            else:
+                accounts = api.account_following(id=user_id, max_id=max_id)
+        except Exception as exc:
+            print(f"An error occurred: {exc}")
+            return []
+
+        if not accounts:
+            print("No accounts returned from the API.")
+            return []
 
         if max_id == accounts[-1].id - 1:
             break
@@ -415,7 +422,16 @@ def analyze_followers(user_id, api, cache):
     max_id = None
 
     for _ in range(MAX_GET_FOLLOWER_IDS_CALLS):
-        accounts = api.account_followers(id=user_id, max_id=max_id)
+        try:
+            accounts = api.account_followers(id=user_id, max_id=max_id)
+        except Exception as exc:
+            print(f"An error occurred: {exc}")
+            return []
+        
+        if not accounts:
+            print("No accounts returned from the API.")
+            return []
+
         follower_ids.extend([account.id for account in accounts])
         max_id = accounts[-1].id - 1
 
@@ -438,10 +454,18 @@ def analyze_timeline(user_id, list_id, api, cache):
 
     # Max 400 toots, 40 at a time.
     for _ in range(MAX_TIMELINE_CALLS):
-        if list_id is not None:
-            statuses = api.timeline_list(id=list_id, max_id=max_id, limit=40)
-        else:
-            statuses = api.timeline_home(max_id=max_id, limit=40)
+        try:
+            if list_id is not None:
+                statuses = api.timeline_list(id=list_id, max_id=max_id, limit=40)
+            else:
+                statuses = api.timeline_home(max_id=max_id, limit=40)
+        except Exception as exc:
+            print(f"An error occurred: {exc}")
+            return []
+
+        if not statuses:
+            print("No statuses returned from the API.")
+            return []
 
         if max_id == statuses[-1].id - 1:
             break        
@@ -462,7 +486,16 @@ This method is never called when deploying the server.
 """
 def analyze_my_timeline(user_id, api, cache):
     # Timeline-functions are limited to 40 statuses
-    statuses = api.timeline(limit=40)
+    try:
+        statuses = api.timeline(limit=40)
+    except Exception as exc:
+        print(f"An error occurred: {exc}")
+        return []
+
+    if not statuses:
+            print("No accounts returned from the API.")
+            return []
+        
     max_id = None
 
     # Max 400 toots, 40 at a time.
@@ -472,7 +505,10 @@ def analyze_my_timeline(user_id, api, cache):
             break
 
         max_id = statuses[-1].id - 1
-        statuses += api.timeline(limit=40, max_id=max_id)    
+        try:
+            statuses += api.timeline(limit=40, max_id=max_id)    
+        except Exception as exc:
+            print(f"An error occurred: {exc}")
 
     reblog_ids = []
     reply_ids = []
@@ -645,6 +681,28 @@ if __name__ == "__main__":
         ("replies", replies),
         ("mentions", mentions),
     ]:
+
+        # Check if the list is empty
+        if not an:  # If an is an empty list
+            print(f"{user_type.capitalize()} data is empty.")
+            print(
+                "{:>25s}\t{:>10s}\t{:>10s}\t{:>10s}".format(
+                    "User Type", "Nonbinary", "Male", "Female"
+                )
+            )
+            print(
+                "{:>25s}\t{:>10d}\t{:>10d}\t{:>10d}".format(
+                    "Guessed from name:", 0, 0, 0
+                )
+            )
+            print(
+                "{:>25s}\t{:>10d}\t{:>10d}\t{:>10d}".format(
+                    "Declared pronouns:", 0, 0, 0
+                )
+            )
+            print("\n")
+            continue  # Skip to the next iteration
+
         nb, men, women, andy = an.nonbinary.n, an.male.n, an.female.n, an.andy.n
 
         print(
