@@ -23,7 +23,7 @@ from analyze import (
     dry_run_analysis,
     get_following_lists,
     get_mastodon_api,
-    get_user_id_from_handle,
+    get_user_from_handle,
 )
 
 logging.getLogger("requests").setLevel(logging.WARNING)
@@ -130,11 +130,13 @@ def index():
     else:
         del form.lst
 
+    different_user = form.acct.data != session.get("mastodon_user")
+
     results = {}
     list_name = list_id = error = None
     if request.method == "POST" and form.validate() and form.acct.data:
         # Don't show auth'ed user's lists in results for another user.
-        if hasattr(form, "lst") and form.acct.data != session.get("mastodon_user"):
+        if hasattr(form, "lst") and different_user:
             del form.lst
 
         if app.config["DRY_RUN"]:
@@ -156,17 +158,29 @@ def index():
                 )
                 cache = Cache()
 
-                user_id = get_user_id_from_handle(api, form.acct.data)
+                user = get_user_from_handle(api, form.acct.data)
+
+                if different_user and user.indexable is False:
+                    print("YOOOOOOOOOO")
+                    raise Exception(
+                        f"User {form.acct.data} is not indexable.\n"
+                        f"If the account is yours, you can change the setting on: "
+                        f"Settings > Public profile > Privacy and reach > "
+                        f"Include public posts in search results"
+                    )
+
                 results = {
-                    "following": analyze_following(user_id, list_id, api, cache),
-                    "followers": analyze_followers(user_id, api, cache),
+                    "following": analyze_following(user.id, list_id, api, cache),
+                    "followers": analyze_followers(user.id, api, cache),
                     "timeline": analyze_timeline(
-                        user_id, list_id, api, cache
+                        user.id, list_id, api, cache
                     ),
                 }
                 for key, value in results.items():
                     if not value:
-                        raise Exception("An error has occurred")
+                        raise Exception(
+                            f"Failed to fetch results for user {form.acct.data}."
+                        )
             except Exception as exc:
                 import traceback
 
@@ -175,12 +189,13 @@ def index():
                     error = f"Could not find user {form.acct.data}."
                 else:
                     error = exc
+                error
 
     return render_template(
         "index.html",
         form=form,
         results=results,
-        error=error,
+        error=str(error).replace("\n", "<br>"),
         div=div,
         list_name=list_name,
         TRACKING_ID=TRACKING_ID,

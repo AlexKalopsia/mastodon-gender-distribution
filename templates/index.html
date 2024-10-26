@@ -171,7 +171,7 @@ td.td-first-col {
 
     {% if error %}
       <h2>Error</h2>
-      <p>{{ error }}</p>
+      <p>{{ error|safe }}</p>
     {% elif results %}
       <h2>Results for @{{ form.acct.data }}</h2>
       <p>

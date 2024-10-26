@@ -312,7 +312,7 @@ def dry_run_analysis():
 
     return following, followers, timeline, boosts, replies, mentions
 
-    
+
 
 
 def analyze_users(users, ids_fetched=None):
@@ -594,6 +594,15 @@ def parse_mastodon_handle(handle):
         instance = None
 
     return username, instance
+
+def get_user_from_handle(api, handle):
+    accounts = api.account_search(handle, limit=1)
+
+    if accounts:
+        account = accounts[0]
+        return account
+    else:
+        return None
 
 def get_user_id_from_handle(api, handle):
     accounts = api.account_search(handle, limit=1)
