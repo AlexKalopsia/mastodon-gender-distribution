@@ -361,8 +361,9 @@ def get_following_lists(
     return list(process_lists())
 
 
-def analyze_self(api):
-    return analyze_user(api.me())
+def analyze_self(handle, api):
+    user = get_user_from_handle(handle, api)
+    return analyze_user(user)
 
 def fetch_users(user_ids, api, cache):
     users = []
@@ -595,7 +596,7 @@ def parse_mastodon_handle(handle):
 
     return username, instance
 
-def get_user_from_handle(api, handle):
+def get_user_from_handle(handle, api):
     accounts = api.account_search(handle, limit=1)
 
     if accounts:
@@ -603,16 +604,6 @@ def get_user_from_handle(api, handle):
         return account
     else:
         return None
-
-def get_user_id_from_handle(api, handle):
-    accounts = api.account_search(handle, limit=1)
-
-    if accounts:
-        account = accounts[0]
-        return account.id
-    else:
-        return None
-
 
 if __name__ == "__main__":
     import argparse
@@ -654,7 +645,7 @@ if __name__ == "__main__":
             g, declared = "male", True
         else:
             api = get_mastodon_api(tok, instance)
-            g, declared = analyze_self(api)
+            g, declared = analyze_self(user_handle, api)
 
         print("{} ({})".format(g, "declared pronoun" if declared else "guess"))
         sys.exit()
@@ -671,7 +662,7 @@ if __name__ == "__main__":
         following, followers, timeline, boosts, replies, mentions = dry_run_analysis()
     else:
         api = get_mastodon_api(tok, instance)
-        user_id = api.me().id
+        user_id = get_user_from_handle(user_handle, api).id
         following = analyze_following(user_id, None, api, cache)
         followers = analyze_followers(user_id, api, cache)
         timeline = analyze_timeline(user_id, None, api, cache)

@@ -38,7 +38,7 @@ if not (CLIENT_KEY and CLIENT_SECRET and INSTANCE):
     raise ValueError(
         "Must set CLIENT_KEY, CLIENT_SECRET and INSTANCE environment variables")
 
-app = Flask("mastodon-gender-proportion")
+app = Flask("mastodon-gender-distribution")
 app.config["SECRET_KEY"] = os.environ["COOKIE_SECRET"]
 app.config["DRY_RUN"] = False
 app.config["MASTODON_CLIENT_ID"] = CLIENT_KEY
@@ -158,7 +158,7 @@ def index():
                 )
                 cache = Cache()
 
-                user = get_user_from_handle(api, form.acct.data)
+                user = get_user_from_handle(form.acct.data, api)
 
                 if different_user and user.indexable is False:
                     print("YOOOOOOOOOO")
