@@ -70,11 +70,77 @@ td.td-first-col {
     alertDiv.classList.add('alert-container-disappear');
   }
 
+  function validate_handle(input) {
+    // Only accept full Mastodon handle (ie alexkalopsia@mastodon.social)
+    const regex = /^[a-zA-Z0-9_]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+    return regex.test(input)
+  }
+
+  function check_input() {
+    let input;
+
+    if (document.getElementById('login_acct')) {
+      input = document.getElementById('login_acct').value.trim()
+    } else if (document.getElementById('analyze_acct')) {
+      input = document.getElementById('analyze_acct').value.trim()
+    }
+
+    const loginButton = document.getElementById('login-btn');
+    const warning = document.getElementById("login-warning");
+    
+    if (validate_handle(input)) {
+        warning.style.display = "none";
+        loginButton.classList.remove('disabled');
+        loginButton.removeAttribute('aria-disabled');
+    } else {
+        if (input != "") {
+          warning.style.display = "block";
+        }
+        loginButton.classList.add('disabled');
+        loginButton.setAttribute('aria-disabled', 'true');
+    }
+  }
+
+  function login_click() {
+    if (login_submit()) {
+        document.getElementById('login-form').submit();
+    }
+  }
+
+  function login_submit() {
+
+    //Update instance link dynamically
+    const input = document.getElementById('login_acct').value.trim();
+    console.log("MY INPUT")
+    console.log(input)
+    const instance = input.split('@')[1];
+    if (instance) {
+        const loginUrl = `{{ url_for('login', instance='') }}` + instance;
+        console.log(loginUrl)
+        document.getElementById('login-btn').href = loginUrl;
+    }
+
+    var button = document.getElementById("login-btn");
+    button.disabled = true;
+
+    var acct = document.getElementById("login_acct");
+    acct.readOnly = true;
+
+    var text = document.getElementById("analyze-button-text");
+    text.style.display = 'none';
+
+    var loading = document.getElementById("analyze-loading");
+    loading.style.display = 'block';
+
+    return true;
+  }
+
   function analyze_click() {
     var button = document.getElementById("analyze-button");
     button.disabled = true;
 
-    var acct = document.getElementById("acct");
+    var acct = document.getElementById("analyze_acct");
     acct.readOnly = true;
 
     var text = document.getElementById("analyze-button-text");
@@ -92,6 +158,37 @@ td.td-first-col {
       alerts[i].classList.add('alert-container-disappear');
     }
   }
+
+  function handle_keydown(event) {
+    if (event.key === 'Enter') {
+      input = document.getElementById('login_acct').value.trim()
+
+      if (!validate_handle(input)) {
+          event.preventDefault();
+          //document.getElementById('login-warning').style.display = 'block';
+      } else {
+          // Optionally, you can perform any additional actions if valid
+          // For example, you might want to submit the form manually or proceed with your logic
+      }
+    }
+  }
+
+  document.getElementById('login-form').onsubmit = function(event) {
+    event.preventDefault(); // Prevent the default form submission
+    
+    const handle = document.getElementById('login_acct').value.trim();
+
+    if (!validate_handle(input)) {
+      console.log("WRONG");
+      return;
+    }
+
+    const instance = handle.split('@')[1];
+    
+    const redirectUrl = `/login?instance=${encodeURIComponent(instance)}`;
+    
+    window.location.href = redirectUrl;
+  };
 
   document.addEventListener('DOMContentLoaded', function() {
     var userid = document.getElementById("acct");
@@ -144,13 +241,14 @@ td.td-first-col {
       <h4>Hello, @{{ session.mastodon_user }}.</h4>
       <p><a href="/logout">Logout</a></p>
       <hr>
-      <form method="post" onsubmit="return analyze_click()">
+      <form method="post" id="analyze-form">
+        <input type="hidden" name="form_type" value="analyze">
         <div class="form-group">
-          <label for="acct">Mastodon User:</label>
+          <label for="analyze_acct">Mastodon user handle:</label>
           <div class="input-group col-xs-4">
             <span class="input-group-addon">@</span>
-            <input type="text" class="form-control" name="acct" id="acct"
-              value="{{ form.acct.data|default(session.mastodon_user, true) }}">
+            <input type="text" class="form-control" name="analyze_acct" id="analyze_acct"
+              value="{{ form.analyze_acct.data|default(session.mastodon_user, true) }}" name="form_type" value="login">
           </div>
           {% if form.lst %}
             <label for="lst">List:</label>
@@ -159,14 +257,26 @@ td.td-first-col {
             </div>
           {% endif %}
         </div>
-        <button id="analyze-button" type="submit" class="btn btn-primary">
+        <button id="analyze-button" type="submit" class="btn btn-primary" onclick="analyze_click()">
           <span id="analyze-loading" style="display: none;">
             <span class="glyphicon glyphicon-refresh spinning"></span> Loading (this can take up to a minute) </span>
           <span id="analyze-button-text" >Analyze</span>
         </button>
       </form>
     {% else %}
-      <a href="/login" class="btn btn-primary">Log in with Mastodon</a>
+      <form method="post" id="login-form">
+        <input type="hidden" name="form_type" value="login">
+        <div class="form-group">
+          <label for="login_acct">Mastodon user handle:</label>
+          <div class="input-group col-xs-4">
+            <span class="input-group-addon">@</span>
+            <input type="text" class="form-control" name="login_acct" id="login_acct"
+              value="{{ form.login_acct.data|default(session.mastodon_user, true) }}" oninput="check_input()" onkeydown="handle_keydown(event)">
+          </div>
+          <small id="login-warning" style="color: red; display: none;">Input full Mastodon handle (ie alexkalopsia@mastodon.social)</small>
+        </div>
+      </form>
+      <a href="#" id="login-btn" class="btn btn-primary disabled" onclick="login_click()">Log in with Mastodon</a>
     {% endif %}
 
     {% if error %}
