@@ -183,6 +183,25 @@ def index():
     else:
         form = LoginForm(request.form)
 
+    print("ANALYZE - LISTS")
+    print(session.get("lists"))
+
+    form_type = request.form.get("form_type")
+    print(f"TYPE {form_type}")
+    if form_type == "analyze":
+        if session.get("lists"):
+            form.lst.choices = [("none", "No list")] + [
+                (str(list["id"]), list["name"]) for list in session["lists"]
+            ]
+            print("LISTS UPDATED")
+        else:
+            del form.lst
+
+        different_user = form.analyze_acct.data != session.get("mastodon_user")
+
+        results = {}
+        list_name = list_id = error = None
+
     if request.method == "POST":
         form_type = request.form.get("form_type")
         if form_type == "login":
@@ -200,24 +219,6 @@ def index():
 
             handle = form.analyze_acct.data
             _, instance = parse_mastodon_handle(handle)
-
-            print("ANALYZE - LISTS")
-            print(session["lists"])
-
-            if session.get("lists"):
-                form.lst.choices = [("none", "No list")] + [
-                    (str(list["id"]), list["name"])
-                    for list in session["lists"]
-                ]
-            else:
-                del form.lst
-
-            different_user = form.analyze_acct.data != session.get(
-                "mastodon_user"
-            )
-
-            results = {}
-            list_name = list_id = error = None
 
             if form.validate() and form.analyze_acct.data:
                 # Don't show auth'ed user's lists in results for another user.

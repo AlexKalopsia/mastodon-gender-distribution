@@ -70,70 +70,105 @@ td.td-first-col {
     alertDiv.classList.add('alert-container-disappear');
   }
 
-  function validate_handle(input) {
+  function is_valid_handle(input) {
     // Only accept full Mastodon handle (ie alexkalopsia@mastodon.social)
     const regex = /^[a-zA-Z0-9_]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
     return regex.test(input)
   }
 
-  function check_input() {
+  function validate_input() {
     let input;
+    let button;
+
+    console.log("VALIDATING")
 
     if (document.getElementById('login_acct')) {
       input = document.getElementById('login_acct').value.trim()
+      button = document.getElementById('login-button');
+      console.log("LOGIN")
+
     } else if (document.getElementById('analyze_acct')) {
       input = document.getElementById('analyze_acct').value.trim()
+      button = document.getElementById('analyze-button');
+      console.log("ANALYZE")
     }
 
-    const loginButton = document.getElementById('login-btn');
     const warning = document.getElementById("login-warning");
     
-    if (validate_handle(input)) {
+    if (is_valid_handle(input)) {
         warning.style.display = "none";
-        loginButton.classList.remove('disabled');
-        loginButton.removeAttribute('aria-disabled');
+        button.classList.remove('disabled');
+        button.removeAttribute('aria-disabled');
+        console.log("VALID!")
+        return true;
     } else {
         if (input != "") {
           warning.style.display = "block";
         }
-        loginButton.classList.add('disabled');
-        loginButton.setAttribute('aria-disabled', 'true');
+        button.classList.add('disabled');
+        button.setAttribute('aria-disabled', 'true');
+    }
+
+    return false;
+  }
+
+  function handle_login_submit(event) {
+    event.preventDefault();
+
+    console.log("LOGIN SUBMIT")
+
+    if (validate_input()) {
+      console.log("SUBMITTING LOGIN!")
+      login_submit()
+    }
+  }
+
+  function handle_analyze_submit(event) {
+    event.preventDefault();
+
+    if (validate_input()) {
+      analyze_submit()
     }
   }
 
   function login_click() {
-    if (login_submit()) {
-        document.getElementById('login-form').submit();
-    }
+    login_submit()
   }
 
   function login_submit() {
 
     const handle = document.getElementById('login_acct').value.trim();
-
-    //Update instance link dynamically 
+ 
     if (handle) {
         const loginUrl = "{{ url_for('login', handle='') }}" + handle;
-        document.getElementById('login-btn').href = loginUrl;
+        window.location.href = loginUrl;
     }
 
-    var button = document.getElementById("login-btn");
+    var button = document.getElementById("login-button");
     button.disabled = true;
 
     var acct = document.getElementById("login_acct");
     acct.readOnly = true;
 
-    var text = document.getElementById("analyze-button-text");
+    var text = document.getElementById("login-button-text");
     text.style.display = 'none';
 
-    var loading = document.getElementById("analyze-loading");
+    var loading = document.getElementById("login-loading");
     loading.style.display = 'block';
 
-    return true;
+    console.log("GOOO")
+
+    document.getElementById('login-form').submit();
   }
 
   function analyze_click() {
+    if (analyze_submit()) {
+        document.getElementById('analyze-form').submit();
+    }
+  }
+
+  function analyze_submit() {
     var button = document.getElementById("analyze-button");
     button.disabled = true;
 
@@ -156,26 +191,12 @@ td.td-first-col {
     }
   }
 
-  function handle_keydown(event) {
-    if (event.key === 'Enter') {
-      input = document.getElementById('login_acct').value.trim()
-
-      if (!validate_handle(input)) {
-          event.preventDefault();
-          //document.getElementById('login-warning').style.display = 'block';
-      } else {
-          // Optionally, you can perform any additional actions if valid
-          // For example, you might want to submit the form manually or proceed with your logic
-      }
-    }
-  }
-
   document.getElementById('login-form').onsubmit = function(event) {
     event.preventDefault(); // Prevent the default form submission
     
     const handle = document.getElementById('login_acct').value.trim();
 
-    if (!validate_handle(input)) {
+    if (!is_valid_handle(input)) {
       console.log("WRONG");
       return;
     }
@@ -237,14 +258,14 @@ td.td-first-col {
       <h4>Hello, @{{ session.mastodon_user }}.</h4>
       <p><a href="/logout">Logout</a></p>
       <hr>
-      <form method="post" id="analyze-form">
+      <form method="post" id="analyze-form" onsubmit="return handle_analyze_submit(event)">
         <input type="hidden" name="form_type" value="analyze">
         <div class="form-group">
           <label for="analyze_acct">Mastodon user handle:</label>
           <div class="input-group col-xs-4">
             <span class="input-group-addon">@</span>
             <input type="text" class="form-control" name="analyze_acct" id="analyze_acct"
-              value="{{ form.analyze_acct.data|default(session.mastodon_user, true) }}" name="form_type" value="analyze">
+              value="{{ form.analyze_acct.data|default(session.mastodon_user, true) }}" oninput="validate_input()">
           </div>
           {% if form.lst %}
             <label for="lst">List:</label>
@@ -260,20 +281,24 @@ td.td-first-col {
         </button>
       </form>
     {% else %}
-      <form method="post" id="login-form">
+      <form method="post" id="login-form" onsubmit="return handle_login_submit(event)">
         <input type="hidden" name="form_type" value="login">
         <div class="form-group">
           <label for="login_acct">Mastodon user handle:</label>
           <div class="input-group col-xs-4">
             <span class="input-group-addon">@</span>
             <input type="text" class="form-control" name="login_acct" id="login_acct"
-              value="{{ form.login_acct.data|default(session.mastodon_user, true) }}" oninput="check_input()" onkeydown="handle_keydown(event)">
+              value="{{ form.login_acct.data|default(session.mastodon_user, true) }}" oninput="validate_input()">
           </div>
           <small id="login-warning" style="color: red; display: none;">Input full Mastodon handle (ie alexkalopsia@mastodon.social)</small>
         </div>
+        <button id="login-button" type="submit" class="btn btn-primary disabled" onclick="login_click()">
+          <span id="analyze-loading" style="display: none;">
+            <span class="glyphicon glyphicon-refresh spinning"></span> Loading (this can take up to a minute) </span>
+          <span id="analyze-button-text" >Log in with Mastodon</span>
+        </button>
       </form>
-      <a href="#" id="login-btn" class="btn btn-primary disabled" onclick="login_click()">Log in with Mastodon</a>
-    {% endif %}
+      {% endif %}
 
     {% if error %}
       <h2>Error</h2>
