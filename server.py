@@ -1,7 +1,11 @@
 import logging
 import os
+import requests
 
-from authlib.integrations.flask_client import OAuth, OAuthError  # pip install Authlib
+from authlib.integrations.flask_client import (
+    OAuth,
+    OAuthError,
+)  # pip install Authlib
 from flask import (  # pip install Flask
     Flask,
     flash,
@@ -11,7 +15,7 @@ from flask import (  # pip install Flask
     session,
     url_for,
 )
-from mastodon import MastodonNotFoundError
+from mastodon import Mastodon, MastodonNotFoundError
 from wtforms import Form, SelectField, StringField  # pip install WTForms
 
 from analyze import (
@@ -21,50 +25,89 @@ from analyze import (
     analyze_timeline,
     div,
     dry_run_analysis,
-    get_following_lists,
     get_mastodon_api,
     get_user_from_handle,
     parse_mastodon_handle,
+    get_following_lists,
 )
 
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-CLIENT_KEY = os.environ.get("CLIENT_KEY")
-CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
-INSTANCE = os.environ.get("INSTANCE")
+APP_NAME = "mastodon-gender-distribution"
 TRACKING_ID = os.environ.get("TRACKING_ID")
 
-if not (CLIENT_KEY and CLIENT_SECRET and INSTANCE):
-    raise ValueError(
-        "Must set CLIENT_KEY, CLIENT_SECRET and INSTANCE environment variables")
-
-app = Flask("mastodon-gender-distribution")
-app.config["SECRET_KEY"] = os.environ["COOKIE_SECRET"]
+app = Flask(APP_NAME)
+app.config["SECRET_KEY"] = os.environ["COOKIE_SECRET"]  # TODO: encrypt
 app.config["DRY_RUN"] = False
-app.config["MASTODON_CLIENT_ID"] = CLIENT_KEY
-app.config["MASTODON_CLIENT_SECRET"] = CLIENT_SECRET
-app.config["MASTODON_INSTANCE"] = INSTANCE
 
 oauth = OAuth(app)
 
+
 @app.route("/login")
 def login():
-    instance = request.args.get('instance')
+    # Get instance from login field
+    handle = request.args.get("handle", "alexkalopsia@mastodon.social")
+    _, instance = parse_mastodon_handle(handle)
+
+    metadata = None
+
+    try:
+        response = requests.get(
+            f"https://{instance}/.well-known/openid-configuration"
+        )
+        response.raise_for_status()
+        metadata = response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to fetch metadata: {e}")
+
+    token_endpoint = (
+        metadata.get("token_endpoint")
+        if metadata
+        else f"https://{instance}/oauth/token"
+    )
+    auth_endpoint = (
+        metadata.get("authorization_endpoint")
+        if metadata
+        else f"https://{instance}/oauth/authorize"
+    )
+
+    client_id, client_secret = Mastodon.create_app(
+        "mastodon-gender-distribution",
+        api_base_url=instance,
+        redirect_uris=[
+            "urn:ietf:wg:oauth:2.0:oob",
+            "http://127.0.0.1:8000/authorized",
+            f"https://{instance}/authorized",
+        ],
+    )
+
+    app.config["MASTODON_CLIENT_ID"] = client_id
+    app.config["MASTODON_CLIENT_SECRET"] = client_secret
+    app.config["MASTODON_INSTANCE"] = instance
+    session["client_id"] = client_id
+    session["client_secret"] = client_secret
+    session["instance"] = instance
+
+    # Register client
     oauth.register(
         name="mastodon",
-        api_base_url="https://"+instance+"/api/v1",
-        access_token_url="https://"+instance+"/oauth/token",
-        authorize_url="https://"+instance+"/oauth/authorize",
-        client_id=CLIENT_KEY,
-        client_secret=CLIENT_SECRET,
-        client_kwargs={
-            "scope": "read",
-        },
+        api_base_url=f"https://{instance}/api/v1",
+        access_token_url=token_endpoint,
+        authorize_url=auth_endpoint,
+        client_id=client_id,
+        client_secret=client_secret,
+        client_kwargs={"scope": "read"},
         fetch_token=lambda: session.get("token"),  # DON'T DO IT IN PRODUCTION
     )
 
-    redirect_uri = url_for("oauth_authorized", instance=instance, _external=True)
+    redirect_uri = url_for(
+        "oauth_authorized",
+        client_id=client_id,
+        client_secret=client_secret,
+        handle=handle,
+        _external=True,
+    )
     return oauth.mastodon.authorize_redirect(redirect_uri)
 
 
@@ -84,37 +127,47 @@ def handle_error(error):
 
 @app.route("/authorized")
 def oauth_authorized():
-    instance = request.args.get('instance')
-    token = oauth.mastodon.authorize_access_token()
-    resp = oauth.mastodon.get(f"https://{instance}/api/v1/accounts/verify_credentials")
-    print("Response status:", resp.status_code)
-    print("Response text:", resp.text)
+
+    args = request.args
+    handle = args.get("handle")
+
+    _, instance = parse_mastodon_handle(handle)
+
+    tok = oauth.mastodon.authorize_access_token()
+    response = oauth.mastodon.get(
+        f"https://{instance}/api/v1/accounts/verify_credentials"
+    )
+
+    print("Response status:", response.status_code)
+    print("Response text:", response.text)
 
     try:
-        profile = resp.json()
-        print(profile)
+        profile = response.json()
     except ValueError as e:
         print("JSON decode error:", e)
         return "Failed to decode JSON response"
-        
-    session["mastodon_token"] = token["access_token"]
+
+    session["mastodon_token"] = tok["access_token"]
     session["mastodon_user"] = profile["acct"]
 
     try:
         session["lists"] = get_following_lists(
             profile["id"],
-            token["access_token"],
+            tok["access_token"],
             instance,
         )
+        print("LISTS:")
+        print(session["lists"])
     except Exception:
         app.logger.exception("Error in get_following_lists, ignoring")
         session["lists"] = []
 
-    flash("You were signed in as %s" % profile["display_name"])
-    return redirect("/")
+    return redirect(url_for("index"))
+
 
 class LoginForm(Form):
     login_acct = StringField("Mastodon user handle")
+
 
 class AnalyzeForm(Form):
     analyze_acct = StringField("Mastodon user handle")
@@ -123,18 +176,20 @@ class AnalyzeForm(Form):
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    tok = session.get(
-        "mastodon_token")
+    tok = session.get("mastodon_token")
 
-    form = LoginForm(request.form)
-    
+    if session.get("mastodon_user"):
+        form = AnalyzeForm(request.form)
+    else:
+        form = LoginForm(request.form)
+
     if request.method == "POST":
         form_type = request.form.get("form_type")
         if form_type == "login":
-            form = LoginForm(request.form)
+
             handle = form.login_acct.data
-            username, instance = parse_mastodon_handle(handle)
-            
+            _, _ = parse_mastodon_handle(handle)
+
             return render_template(
                 "index.html",
                 form=form,
@@ -142,45 +197,61 @@ def index():
                 TRACKING_ID=TRACKING_ID,
             )
         elif form_type == "analyze":
-            form = AnalyzeForm(request.form)
+
+            handle = form.analyze_acct.data
+            _, instance = parse_mastodon_handle(handle)
+
+            print("ANALYZE - LISTS")
+            print(session["lists"])
 
             if session.get("lists"):
                 form.lst.choices = [("none", "No list")] + [
-                    (str(list["id"]), list["name"]) for list in session["lists"]
+                    (str(list["id"]), list["name"])
+                    for list in session["lists"]
                 ]
             else:
                 del form.lst
 
-            different_user = form.analyze_acct.data != session.get("mastodon_user")
+            different_user = form.analyze_acct.data != session.get(
+                "mastodon_user"
+            )
 
             results = {}
             list_name = list_id = error = None
-    
+
             if form.validate() and form.analyze_acct.data:
-            # Don't show auth'ed user's lists in results for another user.
+                # Don't show auth'ed user's lists in results for another user.
                 if hasattr(form, "lst") and different_user:
                     del form.lst
 
                 if app.config["DRY_RUN"]:
                     list_name = None
                     following, followers, timeline = dry_run_analysis()
-                    results = {"following": following, "followers": followers, "timeline": timeline}
+                    results = {
+                        "following": following,
+                        "followers": followers,
+                        "timeline": timeline,
+                    }
                 else:
-                    if session.get("lists") and form.lst and form.lst.data != "none":
+                    if (
+                        session.get("lists")
+                        and form.lst
+                        and form.lst.data != "none"
+                    ):
                         list_id = int(form.lst.data)
                         list_name = [
-                            list["name"] 
-                            for list in session["lists"] 
+                            list["name"]
+                            for list in session["lists"]
                             if int(list["id"]) == list_id
                         ][0]
 
                     try:
-                        api = get_mastodon_api(
-                            tok, INSTANCE
-                        )
+                        api = get_mastodon_api(tok, instance)
                         cache = Cache()
 
-                        user = get_user_from_handle(form.analyze_acct.data, api)
+                        user = get_user_from_handle(
+                            form.analyze_acct.data, api
+                        )
 
                         if different_user and user.indexable is False:
                             raise Exception(
@@ -191,8 +262,12 @@ def index():
                             )
 
                         results = {
-                            "following": analyze_following(user.id, list_id, api, cache),
-                            "followers": analyze_followers(user.id, api, cache),
+                            "following": analyze_following(
+                                user.id, list_id, api, cache
+                            ),
+                            "followers": analyze_followers(
+                                user.id, api, cache
+                            ),
                             "timeline": analyze_timeline(
                                 user.id, list_id, api, cache
                             ),

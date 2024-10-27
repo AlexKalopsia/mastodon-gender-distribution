@@ -115,9 +115,8 @@ class Cache(object):
             >>> self._users = {108192926138721866: {"username": "alexkalopsia"},
             109322706099399045: {"username": "jessejiryudavis"}}
         """
-        uncached_ids = set(user_ids)  - set(self._users)
+        uncached_ids = set(user_ids) - set(self._users)
         return list(uncached_ids)
-
 
     def AddUsers(self, users):
         """
@@ -130,11 +129,14 @@ class Cache(object):
         for user in users:
             self._users[user.id] = user
 
-        #print(self._users)
 
 def declared_gender(description):
     dl = description.lower()
-    if "pronoun.is" in dl and "pronoun.is/she" not in dl and "pronoun.is/he" not in dl:
+    if (
+        "pronoun.is" in dl
+        and "pronoun.is/she" not in dl
+        and "pronoun.is/he" not in dl
+    ):
         return "nonbinary"
 
     guesses = set()
@@ -161,12 +163,17 @@ def analyze_user(user, verbose=False):
         warnings.filterwarnings("ignore")
 
         # Look for explicit Pronouns field, otherwise check bio
-        pronouns_field = next((
-            field['value'] for field in user.fields 
-            if field.get('name') == "Pronouns"),
-            None
+        pronouns_field = next(
+            (
+                field["value"]
+                for field in user.fields
+                if field.get("name") == "Pronouns"
+            ),
+            None,
         )
-        description = pronouns_field if pronouns_field is not None else user.note
+        description = (
+            pronouns_field if pronouns_field is not None else user.note
+        )
         g = declared_gender(description)
 
         if g != "andy":
@@ -196,7 +203,9 @@ def analyze_user(user, verbose=False):
         if verbose:
             print(
                 "{:20s}\t{:40s}\t{:s}".format(
-                    user.username.encode("utf-8"), user.display_name.encode("utf-8"), g
+                    user.username.encode("utf-8"),
+                    user.display_name.encode("utf-8"),
+                    g,
                 )
             )
 
@@ -240,18 +249,28 @@ class Analysis(object):
             attr = getattr(self, gender)
             return attr.n - attr.n_declared
 
-        return self.guessed("nonbinary") + self.guessed("male") + self.guessed("female")
+        return (
+            self.guessed("nonbinary")
+            + self.guessed("male")
+            + self.guessed("female")
+        )
 
     def declared(self, gender=None):
         if gender:
             attr = getattr(self, gender)
             return attr.n_declared
 
-        return self.nonbinary.n_declared + self.male.n_declared + self.female.n_declared
+        return (
+            self.nonbinary.n_declared
+            + self.male.n_declared
+            + self.female.n_declared
+        )
 
     def pct(self, gender):
         attr = getattr(self, gender)
-        return div(100 * attr.n, self.nonbinary.n + self.male.n + self.female.n)
+        return div(
+            100 * attr.n, self.nonbinary.n + self.male.n + self.female.n
+        )
 
 
 def dry_run_analysis():
@@ -312,8 +331,6 @@ def dry_run_analysis():
     return following, followers, timeline, boosts, replies, mentions
 
 
-
-
 def analyze_users(users, ids_fetched=None):
     an = Analysis(ids_sampled=len(users), ids_fetched=ids_fetched)
 
@@ -331,8 +348,7 @@ def batch(it, size):
 
 def get_mastodon_api(access_token, instance="mastodon.social"):
     return Mastodon(
-        access_token=access_token,
-        api_base_url=f"https://{instance}"
+        access_token=access_token, api_base_url=f"https://{instance}"
     )
 
 
@@ -346,16 +362,17 @@ MAX_USERS_LOOKUP_CALLS = 30
 MAX_TIMELINE_CALLS = 10
 
 
-def get_following_lists(
-    user_id, access_token, instance
-):
+def get_following_lists(user_id, access_token, instance):
     api = get_mastodon_api(access_token, instance)
 
     # Only store what we need, avoid oversized session cookie.
     def process_lists():
-        for list in reversed(api.account_lists(id=user_id)):
-            as_dict = list.AsDict()
-            yield {"id": as_dict.get("id"), "name": as_dict.get("display_name")}
+        for list in reversed(api.lists()):
+            print(list)
+            yield {
+                "id": list.get("id"),
+                "name": list.get("title"),
+            }
 
     return list(process_lists())
 
@@ -363,6 +380,7 @@ def get_following_lists(
 def analyze_self(handle, api):
     user = get_user_from_handle(handle, api)
     return analyze_user(user)
+
 
 def fetch_users(user_ids, api, cache):
     users = []
@@ -374,14 +392,15 @@ def fetch_users(user_ids, api, cache):
     for ids in batch(cache.UncachedUsers(user_ids), 40):
         results = api.accounts(ids=ids)
         # [{'id: 1, 'username': 'Gargron' ...}]
-        
+
         for account in results:
             new_users.append(account)
 
     cache.AddUsers(new_users)
     users.extend(new_users)
 
-    return users 
+    return users
+
 
 def analyze_following(user_id, list_id, api, cache):
     following_ids = []
@@ -409,7 +428,9 @@ def analyze_following(user_id, list_id, api, cache):
 
     # We can fetch users' details 100 at a time.
     if len(following_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
-        following_id_sample = random.sample(following_ids, 100 * MAX_USERS_LOOKUP_CALLS)
+        following_id_sample = random.sample(
+            following_ids, 100 * MAX_USERS_LOOKUP_CALLS
+        )
     else:
         following_id_sample = following_ids
 
@@ -427,7 +448,7 @@ def analyze_followers(user_id, api, cache):
         except Exception as exc:
             print(f"An error occurred: {exc}")
             return []
-        
+
         if not accounts:
             print("No accounts returned from the API.")
             return []
@@ -437,16 +458,21 @@ def analyze_followers(user_id, api, cache):
 
     # We can fetch users' details 100 at a time.
     if len(follower_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
-        follower_ids_sample = random.sample(follower_ids, 100 * MAX_USERS_LOOKUP_CALLS)
+        follower_ids_sample = random.sample(
+            follower_ids, 100 * MAX_USERS_LOOKUP_CALLS
+        )
     else:
         follower_ids_sample = follower_ids
 
     users = fetch_users(follower_ids_sample, api, cache)
     return analyze_users(users, ids_fetched=len(follower_ids))
 
+
 """
 Analyze the timeline containing the user's following and followers' toots
 """
+
+
 def analyze_timeline(user_id, list_id, api, cache):
     # Timeline-functions are limited to 40 statuses
     timeline_ids = []
@@ -456,7 +482,9 @@ def analyze_timeline(user_id, list_id, api, cache):
     for _ in range(MAX_TIMELINE_CALLS):
         try:
             if list_id is not None:
-                statuses = api.timeline_list(id=list_id, max_id=max_id, limit=40)
+                statuses = api.timeline_list(
+                    id=list_id, max_id=max_id, limit=40
+                )
             else:
                 statuses = api.timeline_home(max_id=max_id, limit=40)
         except Exception as exc:
@@ -468,7 +496,7 @@ def analyze_timeline(user_id, list_id, api, cache):
             return []
 
         if max_id == statuses[-1].id - 1:
-            break        
+            break
 
         for s in statuses:
             # Skip the current user's own toots.
@@ -480,10 +508,13 @@ def analyze_timeline(user_id, list_id, api, cache):
     users = fetch_users(timeline_ids, api, cache)
     return analyze_users(users, ids_fetched=len(timeline_ids))
 
+
 """
 Analyze the timeline containing the user's own toots.
 This method is never called when deploying the server. 
 """
+
+
 def analyze_my_timeline(user_id, api, cache):
     # Timeline-functions are limited to 40 statuses
     try:
@@ -493,9 +524,9 @@ def analyze_my_timeline(user_id, api, cache):
         return []
 
     if not statuses:
-            print("No accounts returned from the API.")
-            return []
-        
+        print("No accounts returned from the API.")
+        return []
+
     max_id = None
 
     # Max 400 toots, 40 at a time.
@@ -506,7 +537,7 @@ def analyze_my_timeline(user_id, api, cache):
 
         max_id = statuses[-1].id - 1
         try:
-            statuses += api.timeline(limit=40, max_id=max_id)    
+            statuses += api.timeline(limit=40, max_id=max_id)
         except Exception as exc:
             print(f"An error occurred: {exc}")
 
@@ -534,13 +565,14 @@ def analyze_my_timeline(user_id, api, cache):
         newdict[ids] = analyze_users(users, ids_fetched=len(outdict.get(ids)))
     return newdict
 
+
 def get_access_token(client_id, client_secret, instance):
     AUTHORIZATION_URL = f"https://{instance}/oauth/authorize"
     TOKEN_URL = f"https://{instance}/oauth/token"
     REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
 
     oauth_client = OAuth2Session(
-        client_id, redirect_uri=REDIRECT_URI, scope=['read']
+        client_id, redirect_uri=REDIRECT_URI, scope=["read"]
     )
 
     print("\nAuthorizing on Mastodon...\n")
@@ -557,7 +589,6 @@ def get_access_token(client_id, client_secret, instance):
 
     print("\nGenerating and signing request for an access token...\n")
 
-
     resp = f"https://{instance}/oauth/authorize/native?code={code}"
 
     try:
@@ -567,7 +598,9 @@ def get_access_token(client_id, client_secret, instance):
             client_secret=client_secret,
         )
     except ValueError as e:
-        msg = ("Invalid response from Mastodon requesting " "temp token: {0}").format(e)
+        msg = (
+            "Invalid response from Mastodon requesting " "temp token: {0}"
+        ).format(e)
         raise ValueError(msg)
 
     #
@@ -583,17 +616,19 @@ def get_access_token(client_id, client_secret, instance):
 
     print(f"\nAccess Token: {token['access_token']}")
 
-    return token['access_token']
+    return token["access_token"]
+
 
 def parse_mastodon_handle(handle):
-    handle = handle.lstrip('@')
-    if '@' in handle:
-        username, instance = handle.split('@', 1)
+    handle = handle.lstrip("@")
+    if "@" in handle:
+        username, instance = handle.split("@", 1)
     else:
         username = handle
         instance = None
 
     return username, instance
+
 
 def get_user_from_handle(handle, api):
     accounts = api.account_search(handle, limit=1)
@@ -603,6 +638,7 @@ def get_user_from_handle(handle, api):
         return account
     else:
         return None
+
 
 if __name__ == "__main__":
     import argparse
@@ -614,7 +650,9 @@ if __name__ == "__main__":
     )
     p.add_argument("user_handle", nargs=1)
     p.add_argument(
-        "--self", help="perform gender analysis on own user handle", action="store_true"
+        "--self",
+        help="perform gender analysis on own user handle",
+        action="store_true",
     )
     p.add_argument("--dry-run", help="fake results", action="store_true")
     args = p.parse_args()
@@ -623,21 +661,20 @@ if __name__ == "__main__":
     username, instance = parse_mastodon_handle(user_handle)
 
     client_id = os.environ.get("CLIENT_KEY") or input(
-        "Enter your client key: ")
+        "Enter your client key: "
+    )
 
     client_secret = os.environ.get("CLIENT_SECRET") or input(
         "Enter your client secret: "
     )
 
     if instance is None:
-        instance = input(
-            "Enter your Mastodon instance: "
-        )
+        instance = input("Enter your Mastodon instance: ")
 
     if args.dry_run:
         tok = None
     else:
-        tok = get_access_token(client_id, client_secret, instance)    
+        tok = get_access_token(client_id, client_secret, instance)
 
     if args.self:
         if args.dry_run:
@@ -658,7 +695,9 @@ if __name__ == "__main__":
     start = time.time()
     cache = Cache()
     if args.dry_run:
-        following, followers, timeline, boosts, replies, mentions = dry_run_analysis()
+        following, followers, timeline, boosts, replies, mentions = (
+            dry_run_analysis()
+        )
     else:
         api = get_mastodon_api(tok, instance)
         user_id = get_user_from_handle(user_handle, api).id
@@ -702,11 +741,19 @@ if __name__ == "__main__":
             print("\n")
             continue  # Skip to the next iteration
 
-        nb, men, women, andy = an.nonbinary.n, an.male.n, an.female.n, an.andy.n
+        nb, men, women, andy = (
+            an.nonbinary.n,
+            an.male.n,
+            an.female.n,
+            an.andy.n,
+        )
 
         print(
             "{:>25s}\t{:>10.2f}%\t{:10.2f}%\t{:10.2f}%".format(
-                user_type, an.pct("nonbinary"), an.pct("male"), an.pct("female")
+                user_type,
+                an.pct("nonbinary"),
+                an.pct("male"),
+                an.pct("female"),
             )
         )
 

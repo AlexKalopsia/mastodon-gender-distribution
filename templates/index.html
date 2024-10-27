@@ -110,14 +110,11 @@ td.td-first-col {
 
   function login_submit() {
 
-    //Update instance link dynamically
-    const input = document.getElementById('login_acct').value.trim();
-    console.log("MY INPUT")
-    console.log(input)
-    const instance = input.split('@')[1];
-    if (instance) {
-        const loginUrl = `{{ url_for('login', instance='') }}` + instance;
-        console.log(loginUrl)
+    const handle = document.getElementById('login_acct').value.trim();
+
+    //Update instance link dynamically 
+    if (handle) {
+        const loginUrl = "{{ url_for('login', handle='') }}" + handle;
         document.getElementById('login-btn').href = loginUrl;
     }
 
@@ -184,7 +181,6 @@ td.td-first-col {
     }
 
     const instance = handle.split('@')[1];
-    
     const redirectUrl = `/login?instance=${encodeURIComponent(instance)}`;
     
     window.location.href = redirectUrl;
@@ -248,7 +244,7 @@ td.td-first-col {
           <div class="input-group col-xs-4">
             <span class="input-group-addon">@</span>
             <input type="text" class="form-control" name="analyze_acct" id="analyze_acct"
-              value="{{ form.analyze_acct.data|default(session.mastodon_user, true) }}" name="form_type" value="login">
+              value="{{ form.analyze_acct.data|default(session.mastodon_user, true) }}" name="form_type" value="analyze">
           </div>
           {% if form.lst %}
             <label for="lst">List:</label>
