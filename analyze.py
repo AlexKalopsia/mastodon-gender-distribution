@@ -421,7 +421,6 @@ def analyze_following(user_id, list_id, api, cache):
             return []
 
         if not accounts:
-            print("No following accounts returned from the API.")
             break
 
         following_ids.extend([account.id for account in accounts])
@@ -455,7 +454,6 @@ def analyze_followers(user_id, api, cache):
             return []
 
         if not accounts:
-            print("No followers returned from the API.")
             break
 
         follower_ids.extend([account.id for account in accounts])
@@ -501,16 +499,16 @@ def analyze_timeline(user_id, list_id, api, cache):
             return []
 
         if not statuses:
-            print("No statuses returned from the API.")
-            return []
-
-        if max_id == statuses[-1].id - 1:
             break
 
-        for s in statuses:
-            # Skip the current user's own toots.
-            if s.account.id != user_id:
-                timeline_ids.append(s.account.id)
+        timeline_ids.extend(
+            [s.id for s in statuses if s.account.id != user_id]
+        )
+
+        if len(statuses) > 1:
+            max_id = statuses[-1].id - 1
+        else:
+            break
 
     # Reduce to unique list of ids
     timeline_ids = list(set(timeline_ids))
