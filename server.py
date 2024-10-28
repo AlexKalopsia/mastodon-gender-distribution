@@ -177,48 +177,38 @@ class AnalyzeForm(Form):
 @app.route("/", methods=["GET", "POST"])
 def index():
     tok = session.get("mastodon_token")
-
-    if session.get("mastodon_user"):
-        form = AnalyzeForm(request.form)
-    else:
-        form = LoginForm(request.form)
-
-    print("ANALYZE - LISTS")
-    print(session.get("lists"))
-
-    form_type = request.form.get("form_type")
-    print(f"TYPE {form_type}")
-    if form_type == "analyze":
-        if session.get("lists"):
-            form.lst.choices = [("none", "No list")] + [
-                (str(list["id"]), list["name"]) for list in session["lists"]
-            ]
-            print("LISTS UPDATED")
-        else:
-            del form.lst
-
-        different_user = form.analyze_acct.data != session.get("mastodon_user")
-
-        results = {}
-        list_name = list_id = error = None
+    results = {}
+    error = None
+    list_name = None
+    list_id = None
 
     if request.method == "POST":
         form_type = request.form.get("form_type")
         if form_type == "login":
-
+            form = LoginForm(request.form)
             handle = form.login_acct.data
             _, _ = parse_mastodon_handle(handle)
 
-            return render_template(
-                "index.html",
-                form=form,
-                div=div,
-                TRACKING_ID=TRACKING_ID,
-            )
-        elif form_type == "analyze":
+            if form.validate_on_submit():
+                session["mastodon_user"] = handle
+                flash("Logged in successfully!", "success")
+                return redirect(url_for("index"))
 
+        elif form_type == "analyze":
+            form = AnalyzeForm(request.form)
             handle = form.analyze_acct.data
             _, instance = parse_mastodon_handle(handle)
+
+            different_user = form.analyze_acct.data != session.get(
+                "mastodon_user"
+            )
+
+            form.lst.choices = [("none", "No list")]
+            if session.get("lists"):
+                form.lst.choices += [
+                    (str(list["id"]), list["name"])
+                    for list in session["lists"]
+                ]
 
             if form.validate() and form.analyze_acct.data:
                 # Don't show auth'ed user's lists in results for another user.
@@ -290,20 +280,27 @@ def index():
 
                     if error is not None:
                         error = str(error).replace("\n", "<br>")
+                pass
+    else:
+        if session.get("mastodon_user"):
+            form = AnalyzeForm()
+            form.lst.choices = [("none", "No list")]
+            if session.get("lists"):
+                form.lst.choices += [
+                    (str(list["id"]), list["name"])
+                    for list in session["lists"]
+                ]
 
-            return render_template(
-                "index.html",
-                form=form,
-                results=results,
-                error=error,
-                div=div,
-                list_name=list_name,
-                TRACKING_ID=TRACKING_ID,
-            )
+        else:
+            form = LoginForm()
+
     return render_template(
         "index.html",
         form=form,
+        results=results,
+        error=error,
         div=div,
+        list_name=list_name,
         TRACKING_ID=TRACKING_ID,
     )
 
