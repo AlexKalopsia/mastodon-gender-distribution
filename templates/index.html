@@ -105,8 +105,10 @@ td.td-first-col {
       console.log(user + " - " + logged_user);
 
       if (user != logged_user) {
+        console.log("SAME USER");
         document.getElementById("list-group").style.display = "none";
       } else {
+        console.log("SAME USER");
         document.getElementById("list-group").style.display = "block";
       }
     }
@@ -140,9 +142,11 @@ td.td-first-col {
   }
 
   function handle_analyze_submit(event) {
+    console.log("ANALYZE SUBMIT")
     event.preventDefault();
 
     if (validate_input()) {
+      console.log("SUBMITTING ANALYSIS!")
       analyze_submit()
     }
   }

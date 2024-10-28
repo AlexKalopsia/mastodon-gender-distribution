@@ -115,6 +115,7 @@ def login():
 def logout():
     session.pop("mastodon_token")
     session.pop("mastodon_user")
+    session.pop("lists")
     flash("Logged out.")
     return redirect("/")
 
@@ -178,33 +179,35 @@ class AnalyzeForm(Form):
 def index():
     tok = session.get("mastodon_token")
     results = {}
-    error = None
-    list_name = None
-    list_id = None
+    list_name = list_id = error = None
 
-    if request.method == "POST":
+    if request.method == "GET":
+        if session.get("mastodon_user"):
+            form = AnalyzeForm()
+            form.lst.choices = [("none", "No list")]
+            # Populate lists if there are any stored in the session
+            if session.get("lists"):
+                form.lst.choices += [
+                    (str(list["id"]), list["name"])
+                    for list in session["lists"]
+                ]
+        else:
+            form = LoginForm()
+
+    elif request.method == "POST":
         form_type = request.form.get("form_type")
+
         if form_type == "login":
             form = LoginForm(request.form)
-            handle = form.login_acct.data
-            _, _ = parse_mastodon_handle(handle)
 
-            if form.validate_on_submit():
+            if form.validate():
+                handle = form.login_acct.data
                 session["mastodon_user"] = handle
-                flash("Logged in successfully!", "success")
+                flash(f"Logged in successfully as {handle}!", "success")
                 return redirect(url_for("index"))
 
         elif form_type == "analyze":
             form = AnalyzeForm(request.form)
-            handle = form.analyze_acct.data
-            _, instance = parse_mastodon_handle(handle)
-
-            session_user = session.get("mastodon_user")
-
-            different_user = form.analyze_acct.data != session_user
-
-            print(f"DIFFERENT USER {form.analyze_acct.data} - {session_user}")
-
             form.lst.choices = [("none", "No list")]
             if session.get("lists"):
                 form.lst.choices += [
@@ -212,10 +215,14 @@ def index():
                     for list in session["lists"]
                 ]
 
+            handle = form.analyze_acct.data
+
+            session_user = session.get("mastodon_user")
+            different_user = form.analyze_acct.data != session_user
+
+            print(f"DIFFERENT USER {form.analyze_acct.data} - {session_user}")
+
             if form.validate() and form.analyze_acct.data:
-                # Don't show auth'ed user's lists in results for another user.
-                if hasattr(form, "lst") and different_user:
-                    del form.lst
 
                 if app.config["DRY_RUN"]:
                     list_name = None
@@ -226,49 +233,41 @@ def index():
                         "timeline": timeline,
                     }
                 else:
-                    if (
-                        session.get("lists")
-                        and form.lst
-                        and form.lst.data != "none"
-                    ):
-                        list_id = int(form.lst.data)
-                        list_name = [
-                            list["name"]
-                            for list in session["lists"]
-                            if int(list["id"]) == list_id
-                        ][0]
-
                     try:
+                        _, instance = parse_mastodon_handle(handle)
                         api = get_mastodon_api(tok, instance)
                         cache = Cache()
 
                         user = get_user_from_handle(handle, api)
 
-                        if different_user and user.indexable is False:
-                            raise Exception(
-                                f"User {form.analyze_acct.data} is not indexable.\n"
-                                f"If the account is yours, you can change the setting on: "
-                                f"Settings > Public profile > Privacy and reach > "
-                                f"Include public posts in search results"
-                            )
-
-                        results = {
-                            "following": analyze_following(
-                                user.id, list_id, api, cache
-                            ),
-                            "followers": analyze_followers(
-                                user.id, api, cache
-                            ),
-                            "timeline": analyze_timeline(
-                                user.id, list_id, api, cache
-                            ),
-                        }
-                        for key, value in results.items():
-                            if not value:
+                        if user:
+                            if different_user and user.indexable is False:
                                 raise Exception(
-                                    f"Failed to fetch results "
-                                    f"for user {form.analyze_acct.data}."
+                                    f"User {form.analyze_acct.data} is not indexable.\n"
+                                    f"If the account is yours, you can change the setting on: "
+                                    f"Settings > Public profile > Privacy and reach > "
+                                    f"Include public posts in search results"
                                 )
+
+                            results = {
+                                "following": analyze_following(
+                                    user.id, list_id, api, cache
+                                ),
+                                "followers": analyze_followers(
+                                    user.id, api, cache
+                                ),
+                                "timeline": analyze_timeline(
+                                    user.id, list_id, api, cache
+                                ),
+                            }
+                            for key, value in results.items():
+                                if not value:
+                                    raise Exception(
+                                        f"Failed to fetch results "
+                                        f"for user {handle}."
+                                    )
+                        else:
+                            raise Exception(f"Failed to find user {handle}.")
                     except Exception as exc:
                         import traceback
 
@@ -284,20 +283,8 @@ def index():
                             error = exc
 
                     if error is not None:
-                        error = "AAAA" + str(error).replace("\n", "<br>")
+                        error = str(error).replace("\n", "<br>")
                 pass
-    else:
-        if session.get("mastodon_user"):
-            form = AnalyzeForm()
-            form.lst.choices = [("none", "No list")]
-            if session.get("lists"):
-                form.lst.choices += [
-                    (str(list["id"]), list["name"])
-                    for list in session["lists"]
-                ]
-
-        else:
-            form = LoginForm()
 
     return render_template(
         "index.html",
