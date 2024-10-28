@@ -50,7 +50,11 @@ td.td-first-col {
 }
 </style>
 </head>
+{% if session.mastodon_user %}
+<body data-mastodon-user="{{ session.mastodon_user }}">
+{% else %}
 <body>
+{% endif %}
 {% macro render_field(field) %}
 <dt>{{ field.label }}
 <dd>{{ field(**kwargs)|safe }}
@@ -80,21 +84,32 @@ td.td-first-col {
   function validate_input() {
     let input;
     let button;
+    let warning;
 
     console.log("VALIDATING")
 
     if (document.getElementById('login_acct')) {
       input = document.getElementById('login_acct').value.trim()
       button = document.getElementById('login-button');
+      warning = document.getElementById("login-warning");
       console.log("LOGIN")
 
     } else if (document.getElementById('analyze_acct')) {
       input = document.getElementById('analyze_acct').value.trim()
       button = document.getElementById('analyze-button');
+      warning = document.getElementById("analyze-warning");
       console.log("ANALYZE")
-    }
 
-    const warning = document.getElementById("login-warning");
+      const user = document.getElementById('analyze_acct').value;
+      const logged_user = document.body.getAttribute('data-mastodon-user');
+      console.log(user + " - " + logged_user);
+
+      if (user != logged_user) {
+        document.getElementById("list-group").style.display = "none";
+      } else {
+        document.getElementById("list-group").style.display = "block";
+      }
+    }
     
     if (is_valid_handle(input)) {
         warning.style.display = "none";
@@ -132,17 +147,13 @@ td.td-first-col {
     }
   }
 
-  function login_click() {
-    login_submit()
-  }
-
   function login_submit() {
 
     const handle = document.getElementById('login_acct').value.trim();
  
     if (handle) {
-        const loginUrl = "{{ url_for('login', handle='') }}" + handle;
-        window.location.href = loginUrl;
+        const login_url = "{{ url_for('login', handle='') }}" + handle;
+        window.location.href = login_url;
     }
 
     var button = document.getElementById("login-button");
@@ -154,18 +165,13 @@ td.td-first-col {
     var text = document.getElementById("login-button-text");
     text.style.display = 'none';
 
+    // If i remove this, the login breaks, not sure why 
     var loading = document.getElementById("login-loading");
     loading.style.display = 'block';
 
     console.log("GOOO")
 
     document.getElementById('login-form').submit();
-  }
-
-  function analyze_click() {
-    if (analyze_submit()) {
-        document.getElementById('analyze-form').submit();
-    }
   }
 
   function analyze_submit() {
@@ -180,6 +186,8 @@ td.td-first-col {
 
     var loading = document.getElementById("analyze-loading");
     loading.style.display = 'block';
+
+    document.getElementById('analyze-form').submit();
 
     return true;
   }
@@ -267,14 +275,17 @@ td.td-first-col {
             <input type="text" class="form-control" name="analyze_acct" id="analyze_acct"
               value="{{ form.analyze_acct.data|default(session.mastodon_user, true) }}" oninput="validate_input()">
           </div>
+          <small id="analyze-warning" style="color: red; display: none;">Input full Mastodon handle (ie alexkalopsia@mastodon.social)</small>
           {% if form.lst %}
+          <div id="list-group">
             <label for="lst">List:</label>
             <div class="input-group col-xs-4">
               {{ form.lst(class_="form-control") }}
             </div>
+          </div>
           {% endif %}
         </div>
-        <button id="analyze-button" type="submit" class="btn btn-primary" onclick="analyze_click()">
+        <button id="analyze-button" type="submit" class="btn btn-primary" onclick="analyze_submit()">
           <span id="analyze-loading" style="display: none;">
             <span class="glyphicon glyphicon-refresh spinning"></span> Loading (this can take up to a minute) </span>
           <span id="analyze-button-text" >Analyze</span>
@@ -292,10 +303,8 @@ td.td-first-col {
           </div>
           <small id="login-warning" style="color: red; display: none;">Input full Mastodon handle (ie alexkalopsia@mastodon.social)</small>
         </div>
-        <button id="login-button" type="submit" class="btn btn-primary disabled" onclick="login_click()">
-          <span id="analyze-loading" style="display: none;">
-            <span class="glyphicon glyphicon-refresh spinning"></span> Loading (this can take up to a minute) </span>
-          <span id="analyze-button-text" >Log in with Mastodon</span>
+        <button id="login-button" type="submit" class="btn btn-primary disabled" onclick="login_submit()">
+          <span id="login-button-text" >Log in with Mastodon</span>
         </button>
       </form>
       {% endif %}
@@ -304,9 +313,9 @@ td.td-first-col {
       <h2>Error</h2>
       <p>{{ error|safe }}</p>
     {% elif results %}
-      <h2>Results for @{{ form.acct.data }}</h2>
+      <h2>Results for @{{ form.analyze_acct.data }}</h2>
       <p>
-        Sampled {{ results.following.ids_sampled }} people @{{ form.acct.data }} follows{% if list_name %} in list "{{ list_name }}"{% endif %}, {{ results.followers.ids_sampled }} followers and {{ results.timeline.ids_sampled }} users from the latest 200 toots in @{{ form.acct.data }}&#39;s timeline.
+        Sampled {{ results.following.ids_sampled }} people @{{ form.analyze_acct.data }} follows{% if list_name %} in list "{{ list_name }}"{% endif %}, {{ results.followers.ids_sampled }} followers and {{ results.timeline.ids_sampled }} users from the latest 200 toots in @{{ form.analyze_acct.data }}&#39;s timeline.
         Gender estimate based on {{ results.following.declared() + results.followers.declared() + results.timeline.declared() }} Mastodon bios and fields with declared pronouns like "she/her" and {{ results.following.guessed() + results.followers.guessed() + results.timeline.guessed() }} genders guessed from first names.
       </p>
       <table class="table" style="table-layout: fixed; white-space: nowrap">

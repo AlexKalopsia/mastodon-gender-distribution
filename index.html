@@ -50,16 +50,120 @@ td.td-first-col {
 
 
 <script type="text/javascript" async="" src="https://www.googletagmanager.com/gtag/js?id=G-LQK86MYSVJ&amp;cx=c&amp;_slc=1"></script><script async="" src="https://www.google-analytics.com/analytics.js"></script><script type="application/javascript">
-  function close_alert(target) {
-    var alertDiv = target.parentElement.parentElement;
-    alertDiv.classList.add('alert-container-disappear');
+  
+  function is_valid_handle(input) {
+    // Only accept full Mastodon handle (ie alexkalopsia@mastodon.social)
+    const regex = /^[a-zA-Z0-9_]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+    return regex.test(input)
+  }
+
+  function validate_input() {
+    let input;
+    let button;
+    let warning;
+
+    console.log("VALIDATING")
+
+    if (document.getElementById('login_acct')) {
+      input = document.getElementById('login_acct').value.trim()
+      button = document.getElementById('login-button');
+      warning = document.getElementById("login-warning");
+      console.log("LOGIN")
+
+    } else if (document.getElementById('analyze_acct')) {
+      input = document.getElementById('analyze_acct').value.trim()
+      button = document.getElementById('analyze-button');
+      warning = document.getElementById("analyze-warning");
+      console.log("ANALYZE")
+
+      const user = document.getElementById('analyze_acct').value;
+      const logged_user = document.body.getAttribute('data-mastodon-user');
+
+      if (user != logged_user) {
+        document.getElementById("list-group").style.display = "none";
+      } else {
+        document.getElementById("list-group").style.display = "block";
+      }
+    }
+    
+    if (is_valid_handle(input)) {
+        warning.style.display = "none";
+        button.classList.remove('disabled');
+        button.removeAttribute('aria-disabled');
+        console.log("VALID!")
+        return true;
+    } else {
+        if (input != "") {
+          warning.style.display = "block";
+        }
+        button.classList.add('disabled');
+        button.setAttribute('aria-disabled', 'true');
+    }
+
+    return false;
+  }
+
+  function handle_login_submit(event) {
+    event.preventDefault();
+
+    console.log("LOGIN SUBMIT")
+
+    if (validate_input()) {
+      console.log("SUBMITTING LOGIN!")
+      login_submit()
+    }
+  }
+
+  function handle_analyze_submit(event) {
+    event.preventDefault();
+
+    if (validate_input()) {
+      analyze_submit()
+    }
+  }
+
+  function login_click() {
+    login_submit()
+  }
+
+  function login_submit() {
+
+    const handle = document.getElementById('login_acct').value.trim();
+ 
+    if (handle) {
+        const login_url = "{{ url_for('login', handle='') }}" + handle;
+        window.location.href = login_url;
+    }
+
+    var button = document.getElementById("login-button");
+    button.disabled = true;
+
+    var acct = document.getElementById("login_acct");
+    acct.readOnly = true;
+
+    var text = document.getElementById("login-button-text");
+    text.style.display = 'none';
+
+    var loading = document.getElementById("login-loading");
+    loading.style.display = 'block';
+
+    console.log("GOOO")
+
+    document.getElementById('login-form').submit();
   }
 
   function analyze_click() {
+    if (analyze_submit()) {
+        document.getElementById('analyze-form').submit();
+    }
+  }
+
+  function analyze_submit() {
     var button = document.getElementById("analyze-button");
     button.disabled = true;
 
-    var acct = document.getElementById("acct");
+    var acct = document.getElementById("analyze_acct");
     acct.readOnly = true;
 
     var text = document.getElementById("analyze-button-text");

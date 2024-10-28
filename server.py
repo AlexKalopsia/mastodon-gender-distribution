@@ -15,7 +15,7 @@ from flask import (  # pip install Flask
     session,
     url_for,
 )
-from mastodon import Mastodon, MastodonNotFoundError
+from mastodon import Mastodon, MastodonNetworkError, MastodonNotFoundError
 from wtforms import Form, SelectField, StringField  # pip install WTForms
 
 from analyze import (
@@ -148,7 +148,7 @@ def oauth_authorized():
         return "Failed to decode JSON response"
 
     session["mastodon_token"] = tok["access_token"]
-    session["mastodon_user"] = profile["acct"]
+    session["mastodon_user"] = handle
 
     try:
         session["lists"] = get_following_lists(
@@ -199,9 +199,11 @@ def index():
             handle = form.analyze_acct.data
             _, instance = parse_mastodon_handle(handle)
 
-            different_user = form.analyze_acct.data != session.get(
-                "mastodon_user"
-            )
+            session_user = session.get("mastodon_user")
+
+            different_user = form.analyze_acct.data != session_user
+
+            print(f"DIFFERENT USER {form.analyze_acct.data} - {session_user}")
 
             form.lst.choices = [("none", "No list")]
             if session.get("lists"):
@@ -240,9 +242,7 @@ def index():
                         api = get_mastodon_api(tok, instance)
                         cache = Cache()
 
-                        user = get_user_from_handle(
-                            form.analyze_acct.data, api
-                        )
+                        user = get_user_from_handle(handle, api)
 
                         if different_user and user.indexable is False:
                             raise Exception(
@@ -275,11 +275,16 @@ def index():
                         traceback.print_exc()
                         if isinstance(exc, MastodonNotFoundError):
                             error = f"Could not find user {form.analyze_acct.data}."
+                        elif isinstance(exc, MastodonNetworkError):
+                            error = (
+                                f"Could not connect to the Mastodon server {instance}.\n"
+                                "Please check the instance name or try again later."
+                            )
                         else:
                             error = exc
 
                     if error is not None:
-                        error = str(error).replace("\n", "<br>")
+                        error = "AAAA" + str(error).replace("\n", "<br>")
                 pass
     else:
         if session.get("mastodon_user"):
