@@ -167,7 +167,7 @@ def analyze_user(user, verbose=False):
             (
                 field["value"]
                 for field in user.fields
-                if field.get("name") == "Pronouns"
+                if "Pronouns" in field.get("name")
             ),
             None,
         )
@@ -406,6 +406,10 @@ def analyze_following(user_id, list_id, api, cache):
     following_ids = []
     max_id = None
 
+    print(
+        f"Looking for following accounts of user {user_id}, with list {list_id}"
+    )
+
     for _ in range(MAX_GET_FOLLOWING_IDS_CALLS):
         try:
             if list_id is not None:
@@ -417,14 +421,15 @@ def analyze_following(user_id, list_id, api, cache):
             return []
 
         if not accounts:
-            print("No accounts returned from the API.")
-            return []
-
-        if max_id == accounts[-1].id - 1:
+            print("No following accounts returned from the API.")
             break
 
         following_ids.extend([account.id for account in accounts])
-        max_id = accounts[-1].id - 1
+
+        if len(accounts) > 1:
+            max_id = accounts[-1].id - 1
+        else:
+            break
 
     # We can fetch users' details 100 at a time.
     if len(following_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
@@ -450,11 +455,15 @@ def analyze_followers(user_id, api, cache):
             return []
 
         if not accounts:
-            print("No accounts returned from the API.")
-            return []
+            print("No followers returned from the API.")
+            break
 
         follower_ids.extend([account.id for account in accounts])
-        max_id = accounts[-1].id - 1
+
+        if len(accounts) > 1:
+            max_id = accounts[-1].id - 1
+        else:
+            break
 
     # We can fetch users' details 100 at a time.
     if len(follower_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
@@ -524,7 +533,7 @@ def analyze_my_timeline(user_id, api, cache):
         return []
 
     if not statuses:
-        print("No accounts returned from the API.")
+        print("No statuses returned from the API.")
         return []
 
     max_id = None
@@ -631,7 +640,9 @@ def parse_mastodon_handle(handle):
 
 
 def get_user_from_handle(handle, api):
-    accounts = api.account_search(handle, limit=1)
+    print(f"Looking for {handle}")
+    username, instance = parse_mastodon_handle(handle)
+    accounts = api.account_search(username, limit=1)
 
     if accounts:
         account = accounts[0]

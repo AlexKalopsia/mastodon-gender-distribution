@@ -51,9 +51,9 @@ td.td-first-col {
 </style>
 </head>
 {% if session.mastodon_user %}
-<body data-mastodon-user="{{ session.mastodon_user }}">
+<body onload="validate_input()" data-mastodon-user="{{ session.mastodon_user }}">
 {% else %}
-<body>
+<body onload="validate_input()">
 {% endif %}
 {% macro render_field(field) %}
 <dt>{{ field.label }}
@@ -92,23 +92,20 @@ td.td-first-col {
       input = document.getElementById('login_acct').value.trim()
       button = document.getElementById('login-button');
       warning = document.getElementById("login-warning");
-      console.log("LOGIN")
-
     } else if (document.getElementById('analyze_acct')) {
       input = document.getElementById('analyze_acct').value.trim()
       button = document.getElementById('analyze-button');
       warning = document.getElementById("analyze-warning");
-      console.log("ANALYZE")
 
       const user = document.getElementById('analyze_acct').value;
       const logged_user = document.body.getAttribute('data-mastodon-user');
       console.log(user + " - " + logged_user);
 
       if (user != logged_user) {
-        console.log("SAME USER");
+        console.log("SAME USER" + user + " - " + logged_user);
         document.getElementById("list-group").style.display = "none";
       } else {
-        console.log("SAME USER");
+        console.log("DIFFERENT USER" + user + " - " + logged_user);
         document.getElementById("list-group").style.display = "block";
       }
     }

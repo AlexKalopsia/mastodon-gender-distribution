@@ -233,11 +233,22 @@ def index():
                         "timeline": timeline,
                     }
                 else:
+                    # Get selected list
+                    if (
+                        session.get("lists")
+                        and form.lst
+                        and form.lst.data != "none"
+                    ):
+                        list_id = int(form.lst.data)
+                        list_name = [
+                            list["name"]
+                            for list in session["lists"]
+                            if int(list["id"]) == list_id
+                        ][0]
                     try:
                         _, instance = parse_mastodon_handle(handle)
                         api = get_mastodon_api(tok, instance)
                         cache = Cache()
-
                         user = get_user_from_handle(handle, api)
 
                         if user:
@@ -260,6 +271,7 @@ def index():
                                     user.id, list_id, api, cache
                                 ),
                             }
+                            print(results)
                             for key, value in results.items():
                                 if not value:
                                     raise Exception(
