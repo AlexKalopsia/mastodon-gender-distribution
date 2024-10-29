@@ -405,10 +405,6 @@ def analyze_following(user_id, list_id, api, cache):
     following_ids = []
     max_id = None
 
-    print(
-        f"Looking for following accounts of user {user_id}, with list {list_id}"
-    )
-
     for _ in range(MAX_GET_FOLLOWING_IDS_CALLS):
         try:
             if list_id is not None:
@@ -447,8 +443,6 @@ def analyze_following(user_id, list_id, api, cache):
 def analyze_followers(user_id, api, cache):
     follower_ids = []
     max_id = None
-
-    print(f"Looking for followers of user {user_id}")
 
     for _ in range(MAX_GET_FOLLOWER_IDS_CALLS):
         try:
@@ -492,8 +486,6 @@ def analyze_timeline(user_id, list_id, api, cache):
     # Timeline-functions are limited to 40 statuses
     timeline_ids = []
     max_id = None
-
-    print(f"Looking for timeline of user {user_id}, on list {list_id}")
 
     # Max 400 toots, 40 at a time.
     for _ in range(MAX_TIMELINE_CALLS):
@@ -652,7 +644,6 @@ def parse_mastodon_handle(handle):
 
 
 def get_user_from_handle(handle, api):
-    print(f"Looking for user {handle}")
     username, instance = parse_mastodon_handle(handle)
     accounts = api.account_search(username, limit=1)
 
