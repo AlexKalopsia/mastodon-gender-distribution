@@ -368,7 +368,6 @@ def get_following_lists(user_id, access_token, instance):
     # Only store what we need, avoid oversized session cookie.
     def process_lists():
         for list in reversed(api.lists()):
-            print(list)
             yield {
                 "id": list.get("id"),
                 "name": list.get("title"),
@@ -430,6 +429,9 @@ def analyze_following(user_id, list_id, api, cache):
         else:
             break
 
+    if not following_ids:
+        return Analysis(0, 0)
+
     # We can fetch users' details 100 at a time.
     if len(following_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
         following_id_sample = random.sample(
@@ -445,6 +447,8 @@ def analyze_following(user_id, list_id, api, cache):
 def analyze_followers(user_id, api, cache):
     follower_ids = []
     max_id = None
+
+    print(f"Looking for followers of user {user_id}")
 
     for _ in range(MAX_GET_FOLLOWER_IDS_CALLS):
         try:
@@ -463,6 +467,9 @@ def analyze_followers(user_id, api, cache):
         else:
             break
 
+    if not follower_ids:
+        return Analysis(0, 0)
+
     # We can fetch users' details 100 at a time.
     if len(follower_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
         follower_ids_sample = random.sample(
@@ -471,6 +478,7 @@ def analyze_followers(user_id, api, cache):
     else:
         follower_ids_sample = follower_ids
 
+    # Sample of 40
     users = fetch_users(follower_ids_sample, api, cache)
     return analyze_users(users, ids_fetched=len(follower_ids))
 
@@ -484,6 +492,8 @@ def analyze_timeline(user_id, list_id, api, cache):
     # Timeline-functions are limited to 40 statuses
     timeline_ids = []
     max_id = None
+
+    print(f"Looking for timeline of user {user_id}, on list {list_id}")
 
     # Max 400 toots, 40 at a time.
     for _ in range(MAX_TIMELINE_CALLS):
@@ -502,13 +512,16 @@ def analyze_timeline(user_id, list_id, api, cache):
             break
 
         timeline_ids.extend(
-            [s.id for s in statuses if s.account.id != user_id]
+            [s.account.id for s in statuses if s.account.id != user_id]
         )
 
         if len(statuses) > 1:
             max_id = statuses[-1].id - 1
         else:
             break
+
+    if not timeline_ids:
+        return Analysis(0, 0)
 
     # Reduce to unique list of ids
     timeline_ids = list(set(timeline_ids))
@@ -551,6 +564,7 @@ def analyze_my_timeline(user_id, api, cache):
     reblog_ids = []
     reply_ids = []
     timeline_ids = []
+    # TODO: This is from Twitter and doesn't match Mastodon statuses
     for s in statuses:
         if s.reblog is not None:
             reblog_ids.append(s.reblog.account.id)
@@ -638,7 +652,7 @@ def parse_mastodon_handle(handle):
 
 
 def get_user_from_handle(handle, api):
-    print(f"Looking for {handle}")
+    print(f"Looking for user {handle}")
     username, instance = parse_mastodon_handle(handle)
     accounts = api.account_search(username, limit=1)
 
