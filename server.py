@@ -35,6 +35,7 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 APP_NAME = "mastodon-gender-distribution"
+DEPLOY_URL = os.environ.get("DEPLOY_URL", "http://localhost:8000")
 TRACKING_ID = os.environ.get("TRACKING_ID")
 
 app = Flask(APP_NAME)
@@ -77,8 +78,7 @@ def login():
         api_base_url=instance,
         redirect_uris=[
             "urn:ietf:wg:oauth:2.0:oob",
-            "http://127.0.0.1:8000/authorized",
-            f"https://{instance}/authorized",
+            f"{DEPLOY_URL}/authorized",
         ],
     )
 
