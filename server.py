@@ -89,7 +89,19 @@ def login():
     session["client_secret"] = client_secret
     session["instance"] = instance
 
+    tok = session.get("mastodon_token")
+
+    print(
+        f"ID {client_id}, SECRET {client_secret}, INSTANCE {instance}, TOKEN {tok}"
+    )
+
     # Register client
+    # TODO: this should not happen every login
+
+    # This is necessary for subsequent logins on different instances
+    if "mastodon" in oauth._clients:
+        del oauth._clients["mastodon"]
+
     oauth.register(
         name="mastodon",
         api_base_url=f"https://{instance}/api/v1",
@@ -98,7 +110,9 @@ def login():
         client_id=client_id,
         client_secret=client_secret,
         client_kwargs={"scope": "read"},
-        fetch_token=lambda: session.get("token"),  # DON'T DO IT IN PRODUCTION
+        fetch_token=lambda: session.get(
+            "mastodon_token"
+        ),  # DON'T DO IT IN PRODUCTION
     )
 
     redirect_uri = url_for(
@@ -113,9 +127,7 @@ def login():
 
 @app.route("/logout")
 def logout():
-    session.pop("mastodon_token")
-    session.pop("mastodon_user")
-    session.pop("lists")
+    session.clear()
     flash("Logged out.")
     return redirect("/")
 
@@ -140,7 +152,7 @@ def oauth_authorized():
     )
 
     print("Response status:", response.status_code)
-    print("Response text:", response.text)
+    # print("Response text:", response.text)
 
     try:
         profile = response.json()
@@ -157,8 +169,6 @@ def oauth_authorized():
             tok["access_token"],
             instance,
         )
-        print("LISTS:")
-        print(session["lists"])
     except Exception:
         app.logger.exception("Error in get_following_lists, ignoring")
         session["lists"] = []
@@ -180,6 +190,8 @@ def index():
     tok = session.get("mastodon_token")
     results = {}
     list_name = list_id = error = form = None
+
+    print(f"TOKEN {tok}")
 
     if request.method == "GET":
         if session.get("mastodon_user"):
@@ -203,6 +215,7 @@ def index():
             if form.validate():
                 handle = form.login_acct.data
                 session["mastodon_user"] = handle
+                print(f"Validated as {handle}")
                 flash(f"Logged in successfully as {handle}!", "success")
                 return redirect(url_for("index"))
 
@@ -219,8 +232,6 @@ def index():
 
             session_user = session.get("mastodon_user")
             different_user = form.analyze_acct.data != session_user
-
-            print(f"DIFFERENT USER {form.analyze_acct.data} - {session_user}")
 
             if form.validate() and form.analyze_acct.data:
 
@@ -271,7 +282,6 @@ def index():
                                     user.id, list_id, api, cache
                                 ),
                             }
-                            print(results)
                             for key, value in results.items():
                                 if not value:
                                     raise Exception(

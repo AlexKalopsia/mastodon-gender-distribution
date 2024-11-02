@@ -471,12 +471,10 @@ def fetch_users(user_ids, api, cache):
             # [{'id': 1, 'username': 'Gargron', ...}]
             for account in results:
                 new_users.append(User(**account))
-        except requests.RequestException as e:
-            print(f"An error occurred: {e}")
+        except requests.RequestException as exc:
+            print(f"An error occurred: {exc}")
             continue
 
-    print(f"\n\n\n\n\n{new_users}")
-    print(new_users)
     cache.AddUsers(new_users)
     users.extend(new_users)
 
