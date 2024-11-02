@@ -75,14 +75,26 @@ def login():
 
     print(f"DEPLOY TO: {DEPLOY_URL}")
 
-    client_id, client_secret = Mastodon.create_app(
-        "mastodon-gender-distribution",
-        api_base_url=f"https://{instance}",
-        redirect_uris=[
+    client_id, client_id = None
+    payload = {
+        "client_name": APP_NAME,
+        "redirect_uris": [
             "urn:ietf:wg:oauth:2.0:oob",
             f"{DEPLOY_URL}/authorized",
         ],
-    )
+        "scopes": "read",
+    }
+    response = requests.post(f"https://{instance}/api/v1/apps", data=payload)
+
+    if response.status_code == 200:
+        data = response.json()
+        client_id = data.get("client_id")
+        client_secret = data.get("client_secret")
+        print(f"Client ID: {client_id}, Client Secret: {client_secret}")
+    else:
+        print(
+            f"Failed to create app: {response.status_code} - {response.text}"
+        )
 
     app.config["MASTODON_CLIENT_ID"] = client_id
     app.config["MASTODON_CLIENT_SECRET"] = client_secret
