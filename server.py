@@ -73,6 +73,8 @@ def login():
         else f"https://{instance}/oauth/authorize"
     )
 
+    print(f"DEPLOY TO: {DEPLOY_URL}")
+
     client_id, client_secret = Mastodon.create_app(
         "mastodon-gender-distribution",
         api_base_url=instance,
