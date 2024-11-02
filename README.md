@@ -1,12 +1,12 @@
 Gender Distribution of Mastodon Connections and Followers
 ====================================================
 
-> [!WARNING]  
+> [!NOTE]  
 > The original tool was created by [ajdavis](https://github.com/ajdavis/proporti.onl) for Twitter,
 > before the free API got shut down.\
 > I have adapted the original project to work with Mastodon.
 
-This tool guesses the gender of your followers and those you follow by looking in
+Mastodon Proporti.onl guesses the gender of your followers and those you follow by looking in
 their Mastodon profile names, bios, and extra fields for pronoun announcements like "she/her", or else guessing
 based on first name.
 
