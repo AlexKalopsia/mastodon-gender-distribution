@@ -77,7 +77,7 @@ def login():
 
     client_id, client_secret = Mastodon.create_app(
         "mastodon-gender-distribution",
-        api_base_url=instance,
+        api_base_url=f"https://{instance}",
         redirect_uris=[
             "urn:ietf:wg:oauth:2.0:oob",
             f"{DEPLOY_URL}/authorized",
