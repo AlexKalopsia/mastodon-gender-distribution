@@ -32,7 +32,7 @@ jobs:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
         if [ "${GITHUB_REF}" == "refs/heads/master" ]; then
-          railway up --environment production -- --token ${RAILWAY_TOKEN} 
+          railway up --environment production -- --token "${RAILWAY_TOKEN}" 
         elif [ "${GITHUB_REF}" == "refs/heads/dev" ]; then
-          railway up --environment dev -- --token ${RAILWAY_TOKEN} 
+          railway up --environment dev -- --token "${RAILWAY_TOKEN}" 
         fi
