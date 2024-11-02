@@ -17,6 +17,7 @@ from flask import (  # pip install Flask
 )
 from mastodon import Mastodon, MastodonNetworkError, MastodonNotFoundError
 from wtforms import Form, SelectField, StringField  # pip install WTForms
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from analyze import (
     Cache,
@@ -42,6 +43,7 @@ app = Flask(APP_NAME)
 app.config["SECRET_KEY"] = os.environ["COOKIE_SECRET"]
 app.config["DRY_RUN"] = False
 app.config["PREFERRED_URL_SCHEME"] = "https"
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 oauth = OAuth(app)
 
