@@ -1,6 +1,5 @@
 Authlib==0.15.3
 certifi==2022.12.7
-cffi==1.15.1
 chardet==4.0.0
 click==8.0.1
 cryptography==41.0.0
