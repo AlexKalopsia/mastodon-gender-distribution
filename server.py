@@ -89,12 +89,6 @@ def login():
     session["client_secret"] = client_secret
     session["instance"] = instance
 
-    tok = session.get("mastodon_token")
-
-    print(
-        f"ID {client_id}, SECRET {client_secret}, INSTANCE {instance}, TOKEN {tok}"
-    )
-
     # Register client
     # TODO: this should not happen every login
 
@@ -190,8 +184,6 @@ def index():
     tok = session.get("mastodon_token")
     results = {}
     list_name = list_id = error = form = None
-
-    print(f"TOKEN {tok}")
 
     if request.method == "GET":
         if session.get("mastodon_user"):
