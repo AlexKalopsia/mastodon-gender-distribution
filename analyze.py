@@ -23,6 +23,66 @@ else:
         pickle.dump(detector, f)
 
 
+class User:
+    def __init__(
+        self,
+        id=None,
+        username=None,
+        acct=None,
+        display_name=None,
+        locked=False,
+        bot=False,
+        discoverable=False,
+        indexable=False,
+        group=False,
+        created_at=None,
+        note=None,
+        url=None,
+        uri=None,
+        avatar=None,
+        avatar_static=None,
+        header=None,
+        header_static=None,
+        followers_count=0,
+        following_count=0,
+        statuses_count=0,
+        last_status_at=None,
+        hide_collections=False,
+        noindex=False,
+        emojis=None,
+        roles=None,
+        fields=None,
+        moved=False,
+    ):
+        self.id = id
+        self.username = username
+        self.acct = acct
+        self.display_name = display_name
+        self.locked = locked
+        self.bot = bot
+        self.discoverable = discoverable
+        self.indexable = indexable
+        self.group = group
+        self.created_at = created_at
+        self.note = note
+        self.url = url
+        self.uri = uri
+        self.avatar = avatar
+        self.avatar_static = avatar_static
+        self.header = header
+        self.header_static = header_static
+        self.followers_count = followers_count
+        self.following_count = following_count
+        self.statuses_count = statuses_count
+        self.last_status_at = last_status_at
+        self.hide_collections = hide_collections
+        self.noindex = noindex
+        self.emojis = emojis
+        self.roles = roles
+        self.fields = fields
+        self.moved = moved
+
+
 def split(s):
     try:
         return s.split()[0]
@@ -393,6 +453,13 @@ def fetch_users(user_ids, api, cache):
         # TODO: Change to api.accounts(ids=ids) once PR is merged on Mastodon.py
         # results = api.accounts(ids=ids)
 
+        # ids = [self.__unpack_id(id) for id in ids]
+        # if isinstance(id, dict) and "id" in id:
+        #     id = id["id"]
+        # if dateconv and isinstance(id, datetime.datetime):
+        #     id = (int(id.timestamp()) << 16) * 1000
+        # return id
+
         url = f"{api.api_base_url}/api/v1/accounts"
         params = {"id[]": ids}
 
@@ -400,13 +467,16 @@ def fetch_users(user_ids, api, cache):
             response = requests.get(url, params=params)
             response.raise_for_status()
             results = response.json()
+
             # [{'id': 1, 'username': 'Gargron', ...}]
             for account in results:
-                new_users.append(account)
+                new_users.append(User(**account))
         except requests.RequestException as e:
             print(f"An error occurred: {e}")
             continue
 
+    print(f"\n\n\n\n\n{new_users}")
+    print(new_users)
     cache.AddUsers(new_users)
     users.extend(new_users)
 
