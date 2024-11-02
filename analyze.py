@@ -53,6 +53,7 @@ class User:
         roles=None,
         fields=None,
         moved=False,
+        limited=False,
     ):
         self.id = id
         self.username = username
@@ -81,6 +82,7 @@ class User:
         self.roles = roles
         self.fields = fields
         self.moved = moved
+        self.limited = limited
 
 
 def split(s):
