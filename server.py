@@ -75,7 +75,7 @@ def login():
 
     print(f"DEPLOY TO: {DEPLOY_URL}")
 
-    client_id, client_id = None
+    client_id, client_secret = None
     payload = {
         "client_name": APP_NAME,
         "redirect_uris": [
