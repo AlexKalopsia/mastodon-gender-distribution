@@ -11,6 +11,7 @@ import gender_guesser.detector as gender
 from mastodon import (
     Mastodon,
 )
+import requests
 from requests_oauthlib import OAuth2Session  # pip install requests-oauthlib
 from unidecode import unidecode
 
@@ -389,11 +390,22 @@ def fetch_users(user_ids, api, cache):
     # Batch of uncached users
     new_users = []
     for ids in batch(cache.UncachedUsers(user_ids), 40):
-        results = api.accounts(ids=ids)
-        # [{'id: 1, 'username': 'Gargron' ...}]
+        # TODO: Change to api.accounts(ids=ids) once PR is merged on Mastodon.py
+        # results = api.accounts(ids=ids)
 
-        for account in results:
-            new_users.append(account)
+        url = f"https://{instance}/api/v1/accounts"
+        params = {"id[]": ids}
+
+        try:
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+            results = response.json()
+            # [{'id': 1, 'username': 'Gargron', ...}]
+            for account in results:
+                new_users.append(account)
+        except requests.RequestException as e:
+            print(f"An error occurred: {e}")
+            continue
 
     cache.AddUsers(new_users)
     users.extend(new_users)
