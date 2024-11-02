@@ -179,7 +179,7 @@ class AnalyzeForm(Form):
 def index():
     tok = session.get("mastodon_token")
     results = {}
-    list_name = list_id = error = None
+    list_name = list_id = error = form = None
 
     if request.method == "GET":
         if session.get("mastodon_user"):

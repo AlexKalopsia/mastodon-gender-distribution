@@ -393,7 +393,7 @@ def fetch_users(user_ids, api, cache):
         # TODO: Change to api.accounts(ids=ids) once PR is merged on Mastodon.py
         # results = api.accounts(ids=ids)
 
-        url = f"https://{instance}/api/v1/accounts"
+        url = f"{api.api_base_url}/api/v1/accounts"
         params = {"id[]": ids}
 
         try:
@@ -656,7 +656,7 @@ def parse_mastodon_handle(handle):
 
 
 def get_user_from_handle(handle, api):
-    username, instance = parse_mastodon_handle(handle)
+    username, _ = parse_mastodon_handle(handle)
     accounts = api.account_search(username, limit=1)
 
     if accounts:
