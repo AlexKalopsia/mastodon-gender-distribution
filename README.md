@@ -2,12 +2,12 @@ Gender Distribution of Mastodon Connections and Followers
 ====================================================
 
 > [!WARNING]  
-> The original Twitter tool was done by ajdavis on [ajdavis/proporti.onl](https://github.com/ajdavis/proporti.onl),
+> The original tool was created by [ajdavis](https://github.com/ajdavis/proporti.onl) for Twitter,
 > before the free API got shut down.\
-> I adapted it to work with Mastodon. 
+> I have adapted the original project to work with Mastodon.
 
-This tool guesses the gender of your following account and followers by looking in
-their Mastodon bios for pronoun announcements like "she/her", or else guessing
+This tool guesses the gender of your followers and those you follow by looking in
+their Mastodon profile names, bios, and extra fields for pronoun announcements like "she/her", or else guessing
 based on first name.
 
 Read the original author's article **["72% Of The People I Follow On Twitter Are
@@ -18,9 +18,16 @@ Install
 
 This script requires Python 3.8, and the packages listed in `requirements.txt`.
 
+```python
+py -m pip install -r requirements.txt
 ```
-python3 -m pip install -r requirements.txt
-```
+
+Deploy
+-------
+
+The repo contains an example `app_render.wsgi` config useful when deploying to PythonAnywhere.
+
+If you want to deploy to Radar, make sure you set the `COOKIE_SECRET` and `DEPLOY_URL` env variables.
 
 Command-line Use
 ----------------
@@ -28,8 +35,8 @@ Command-line Use
 Pass a Mastodon user handle to analyze the accounts the user follows and their followers.\
 It supports formats such as `alexkalopsia`, `@alexkalopsia`, `@alexkalopsia@mastodon.social` and `alexkalopsia@mastodon.social`:
 
-```
-python3 analyze.py alexkalopsia
+```python
+py analyze.py alexkalopsia@mastodon.social
 ```
 
 Test
@@ -37,8 +44,8 @@ Test
 
 From the repository root directory:
 
-```
-python3 -m unittest discover -v
+```python
+py -m unittest discover -v
 ```
 
 Website
@@ -47,12 +54,13 @@ Website
 Start a Flask server for testing:
 
 Linux
-```
-CLIENT_KEY=foo CLIENT_SECRET=bar COOKIE_SECRET=baz INSTANCE=mastodon.social python3 server.py 8000
+
+```bash
+COOKIE_SECRET=foo python3 server.py 8000
 ```
 
 Windows
-```
-$env:CLIENT_KEY="foo"; $env:CLIENT_SECRET="bar"; $env:COOKIE_SECRET="baz"; $env:INSTANCE="mastodon.social"; py 
-server.py 8000
+
+```bash
+$env:COOKIE_SECRET="foo"; py server.py 8000
 ```
