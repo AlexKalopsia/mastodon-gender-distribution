@@ -118,6 +118,7 @@ def login():
         handle=handle,
         _external=True,
     )
+    print(f"AUTH URL: {redirect_uri}")
     return oauth.mastodon.authorize_redirect(redirect_uri)
 
 
