@@ -39,6 +39,7 @@ DEPLOY_URL = os.environ.get("DEPLOY_URL", "http://localhost:8000")
 TRACKING_ID = os.environ.get("TRACKING_ID")
 
 app = Flask(APP_NAME)
+app.config["SECRET_KEY"] = os.environ["COOKIE_SECRET"]
 app.config["DRY_RUN"] = False
 
 oauth = OAuth(app)
