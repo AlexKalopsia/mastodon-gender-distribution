@@ -1,0 +1,38 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+    paths-ignore:
+      - 'README.md'
+      - 'app_config.wsgi'
+      - 'deploy.py'
+      - 'LICENSE'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+
+    - name: Install Railway CLI
+      run: curl -fsSL https://railway.app/install.sh | sh
+
+    - name: Deploy to Railway
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      run: |
+        if [ "${{ github.ref }}" == "refs/heads/master" ]; then
+          railway up --token $RAILWAY_TOKEN --environment production
+        elif [ "${{ github.ref }}" == "refs/heads/dev" ]; then
+          railway up --token $RAILWAY_TOKEN --environment dev
+        fi
