@@ -28,11 +28,9 @@ jobs:
       run: curl -fsSL https://railway.app/install.sh | sh
 
     - name: Deploy to Railway
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       run: |
         if [ "${GITHUB_REF}" == "refs/heads/master" ]; then
-          RAILWAY_TOKEN="${RAILWAY_TOKEN}" railway up --environment production 
+          RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN_PROD }}" railway up --environment production 
         elif [ "${GITHUB_REF}" == "refs/heads/dev" ]; then
-          RAILWAY_TOKEN="${RAILWAY_TOKEN}" railway up --environment dev
+          RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN_DEV }}" railway up --environment dev
         fi
