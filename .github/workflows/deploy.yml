@@ -6,10 +6,15 @@ on:
       - master
       - dev
     paths-ignore:
-      - 'README.md'
+      - '.github/**'
+      - '.tests/**'
+      - '.gitignore'
       - 'app_config.wsgi'
+      - 'base-requirements.txt'
       - 'deploy.py'
       - 'LICENSE'
+      - 'README.md'
+      - 'requirements.txt'
 
 jobs:
   deploy:
