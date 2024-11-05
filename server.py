@@ -151,9 +151,6 @@ def oauth_authorized():
         f"https://{instance}/api/v1/accounts/verify_credentials"
     )
 
-    print("Response status:", response.status_code)
-    # print("Response text:", response.text)
-
     try:
         profile = response.json()
     except ValueError as e:
