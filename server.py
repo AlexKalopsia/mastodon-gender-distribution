@@ -58,7 +58,7 @@ def login():
 
     try:
         response = requests.get(
-            f"https://{instance}/.well-known/openid-configuration"
+            f"https://{instance}/.well-known/oauth-authorization-server"
         )
         response.raise_for_status()
         metadata = response.json()
@@ -150,9 +150,6 @@ def oauth_authorized():
     response = oauth.mastodon.get(
         f"https://{instance}/api/v1/accounts/verify_credentials"
     )
-
-    print("Response status:", response.status_code)
-    # print("Response text:", response.text)
 
     try:
         profile = response.json()

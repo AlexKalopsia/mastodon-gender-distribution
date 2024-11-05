@@ -54,6 +54,7 @@ class User:
         fields=None,
         moved=False,
         limited=False,
+        suspended=False,
     ):
         self.id = id
         self.username = username
@@ -83,6 +84,7 @@ class User:
         self.fields = fields
         self.moved = moved
         self.limited = limited
+        self.suspended = suspended
 
 
 def split(s):
@@ -485,26 +487,21 @@ def fetch_users(user_ids, api, cache):
 
 def analyze_following(user_id, list_id, api, cache):
     following_ids = []
-    max_id = None
+
+    if list_id is not None:
+        accounts = api.list_accounts(id=list_id, limit=80)
+    else:
+        accounts = api.account_following(id=user_id, limit=80)
 
     for _ in range(MAX_GET_FOLLOWING_IDS_CALLS):
-        try:
-            if list_id is not None:
-                accounts = api.list_accounts(id=list_id, max_id=max_id)
-            else:
-                accounts = api.account_following(id=user_id, max_id=max_id)
-        except Exception as exc:
-            print(f"An error occurred: {exc}")
-            return []
-
         if not accounts:
             break
 
         following_ids.extend([account.id for account in accounts])
 
-        if len(accounts) > 1:
-            max_id = accounts[-1].id - 1
-        else:
+        accounts = api.fetch_next(accounts)
+
+        if accounts is None:
             break
 
     if not following_ids:
@@ -524,23 +521,18 @@ def analyze_following(user_id, list_id, api, cache):
 
 def analyze_followers(user_id, api, cache):
     follower_ids = []
-    max_id = None
+
+    accounts = api.account_followers(id=user_id, limit=80)
 
     for _ in range(MAX_GET_FOLLOWER_IDS_CALLS):
-        try:
-            accounts = api.account_followers(id=user_id, max_id=max_id)
-        except Exception as exc:
-            print(f"An error occurred: {exc}")
-            return []
-
         if not accounts:
             break
 
         follower_ids.extend([account.id for account in accounts])
 
-        if len(accounts) > 1:
-            max_id = accounts[-1].id - 1
-        else:
+        accounts = api.fetch_next(accounts)
+
+        if accounts is None:
             break
 
     if not follower_ids:
@@ -567,21 +559,14 @@ Analyze the timeline containing the user's following and followers' toots
 def analyze_timeline(user_id, list_id, api, cache):
     # Timeline-functions are limited to 40 statuses
     timeline_ids = []
-    max_id = None
+
+    if list_id is not None:
+        statuses = api.timeline_list(id=list_id, limit=40)
+    else:
+        statuses = api.timeline_home(limit=40)
 
     # Max 400 toots, 40 at a time.
     for _ in range(MAX_TIMELINE_CALLS):
-        try:
-            if list_id is not None:
-                statuses = api.timeline_list(
-                    id=list_id, max_id=max_id, limit=40
-                )
-            else:
-                statuses = api.timeline_home(max_id=max_id, limit=40)
-        except Exception as exc:
-            print(f"An error occurred: {exc}")
-            return []
-
         if not statuses:
             break
 
@@ -589,9 +574,9 @@ def analyze_timeline(user_id, list_id, api, cache):
             [s.account.id for s in statuses if s.account.id != user_id]
         )
 
-        if len(statuses) > 1:
-            max_id = statuses[-1].id - 1
-        else:
+        statuses = api.fetch_next(statuses)
+
+        if statuses is None:
             break
 
     if not timeline_ids:
@@ -610,30 +595,25 @@ This method is never called when deploying the server.
 
 
 def analyze_my_timeline(user_id, api, cache):
+    timeline_ids = []
+
     # Timeline-functions are limited to 40 statuses
-    try:
-        statuses = api.timeline(limit=40)
-    except Exception as exc:
-        print(f"An error occurred: {exc}")
-        return []
-
-    if not statuses:
-        print("No statuses returned from the API.")
-        return []
-
-    max_id = None
+    statuses = api.timeline_home(limit=40)
 
     # Max 400 toots, 40 at a time.
     for _ in range(1, MAX_TIMELINE_CALLS):
 
-        if max_id == statuses[-1].id - 1:
+        if not statuses:
             break
 
-        max_id = statuses[-1].id - 1
-        try:
-            statuses += api.timeline(limit=40, max_id=max_id)
-        except Exception as exc:
-            print(f"An error occurred: {exc}")
+        timeline_ids.extend(
+            [s.account.id for s in statuses if s.account.id != user_id]
+        )
+
+        statuses = api.fetch_next(statuses)
+
+        if statuses is None:
+            break
 
     reblog_ids = []
     reply_ids = []
