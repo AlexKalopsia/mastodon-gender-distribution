@@ -58,7 +58,7 @@ def login():
 
     try:
         response = requests.get(
-            f"https://{instance}/.well-known/openid-configuration"
+            f"https://{instance}/.well-known/oauth-authorization-server"
         )
         response.raise_for_status()
         metadata = response.json()
