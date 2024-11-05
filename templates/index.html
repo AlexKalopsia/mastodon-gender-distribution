@@ -99,13 +99,10 @@ td.td-first-col {
 
       const user = document.getElementById('analyze_acct').value;
       const logged_user = document.body.getAttribute('data-mastodon-user');
-      console.log(user + " - " + logged_user);
 
       if (user != logged_user) {
-        console.log("SAME USER" + user + " - " + logged_user);
         document.getElementById("list-group").style.display = "none";
       } else {
-        console.log("DIFFERENT USER" + user + " - " + logged_user);
         document.getElementById("list-group").style.display = "block";
       }
     }
@@ -130,20 +127,15 @@ td.td-first-col {
   function handle_login_submit(event) {
     event.preventDefault();
 
-    console.log("LOGIN SUBMIT")
-
     if (validate_input()) {
-      console.log("SUBMITTING LOGIN!")
       login_submit()
     }
   }
 
   function handle_analyze_submit(event) {
-    console.log("ANALYZE SUBMIT")
     event.preventDefault();
 
     if (validate_input()) {
-      console.log("SUBMITTING ANALYSIS!")
       analyze_submit()
     }
   }
@@ -169,8 +161,6 @@ td.td-first-col {
     // If i remove this, the login breaks, not sure why 
     var loading = document.getElementById("login-loading");
     loading.style.display = 'block';
-
-    console.log("GOOO")
 
     document.getElementById('login-form').submit();
   }
@@ -200,39 +190,22 @@ td.td-first-col {
     }
   }
 
-  document.getElementById('login-form').onsubmit = function(event) {
-    event.preventDefault(); // Prevent the default form submission
-    
-    const handle = document.getElementById('login_acct').value.trim();
-
-    if (!is_valid_handle(input)) {
-      console.log("WRONG");
-      return;
-    }
-
-    const instance = handle.split('@')[1];
-    const redirectUrl = `/login?instance=${encodeURIComponent(instance)}`;
-    
-    window.location.href = redirectUrl;
-  };
-
   document.addEventListener('DOMContentLoaded', function() {
-    var userid = document.getElementById("acct");
-    var lst = document.getElementById("lst");
-    if (userid === null || lst === null) {
-      // Not logged in to Mastodon.
-      return;
-    }
+    // login-form might not immediately exists, so wait for page load
+    document.getElementById('login-form').onsubmit = function(event) {
+      event.preventDefault();
+      
+      const handle = document.getElementById('login_acct').value.trim();
 
-    userid.onkeyup = function() {
-      /* if the auth'ed user has Mastodon lists but a different user name is in
-       * the text box, hide the lists */
-      if (lst !== null) {
-        lst.disabled = (userid.value !== "{{ session.mastodon_user }}");
+      if (!is_valid_handle(input)) {
+        return;
       }
-    };
 
-    setTimeout(close_alerts, 8000);
+      const instance = handle.split('@')[1];
+      const redirectUrl = `/login?instance=${encodeURIComponent(instance)}`;
+      
+      window.location.href = redirectUrl;
+    };
   }, false);
 </script>
 

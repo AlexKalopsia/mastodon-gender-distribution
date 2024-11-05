@@ -63,19 +63,15 @@ td.td-first-col {
     let button;
     let warning;
 
-    console.log("VALIDATING")
-
     if (document.getElementById('login_acct')) {
       input = document.getElementById('login_acct').value.trim()
       button = document.getElementById('login-button');
       warning = document.getElementById("login-warning");
-      console.log("LOGIN")
-
+ 
     } else if (document.getElementById('analyze_acct')) {
       input = document.getElementById('analyze_acct').value.trim()
       button = document.getElementById('analyze-button');
       warning = document.getElementById("analyze-warning");
-      console.log("ANALYZE")
 
       const user = document.getElementById('analyze_acct').value;
       const logged_user = document.body.getAttribute('data-mastodon-user');
@@ -91,7 +87,6 @@ td.td-first-col {
         warning.style.display = "none";
         button.classList.remove('disabled');
         button.removeAttribute('aria-disabled');
-        console.log("VALID!")
         return true;
     } else {
         if (input != "") {
@@ -107,10 +102,7 @@ td.td-first-col {
   function handle_login_submit(event) {
     event.preventDefault();
 
-    console.log("LOGIN SUBMIT")
-
     if (validate_input()) {
-      console.log("SUBMITTING LOGIN!")
       login_submit()
     }
   }
@@ -148,8 +140,6 @@ td.td-first-col {
     var loading = document.getElementById("login-loading");
     loading.style.display = 'block';
 
-    console.log("GOOO")
-
     document.getElementById('login-form').submit();
   }
 
@@ -181,25 +171,6 @@ td.td-first-col {
       alerts[i].classList.add('alert-container-disappear');
     }
   }
-
-  document.addEventListener('DOMContentLoaded', function() {
-    var userid = document.getElementById("acct");
-    var lst = document.getElementById("lst");
-    if (userid === null || lst === null) {
-      // Not logged in to Mastodon.
-      return;
-    }
-
-    userid.onkeyup = function() {
-      /* if the auth'ed user has Mastodon lists but a different user name is in
-       * the text box, hide the lists */
-      if (lst !== null) {
-        lst.disabled = (userid.value !== "");
-      }
-    };
-
-    setTimeout(close_alerts, 8000);
-  }, false);
 </script>
 
 <div class="container-fluid">
@@ -214,15 +185,7 @@ td.td-first-col {
     </p>
     <p>I want you to be able to do this, too. Estimate the distribution of those you follow and see if there's room to improve!</p>
     <hr>
-
-
       <a href="#" class="btn btn-primary">Log in with Mastodon</a>
-
-
-
-
-
-
     </div>
   </div>
   <div class="row">
