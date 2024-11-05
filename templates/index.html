@@ -75,43 +75,43 @@ td.td-first-col {
   }
 
   function is_valid_handle(input) {
-    // Only accept full Mastodon handle (ie alexkalopsia@mastodon.social)
+    // Only accept full Mastodon handle (ie username@mastodon.social)
     const regex = /^[a-zA-Z0-9_]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
     return regex.test(input)
   }
 
   function validate_input() {
-    let input;
+    let handle;
     let button;
     let warning;
-
-    console.log("VALIDATING")
 
     if (document.getElementById('login_acct')) {
       input = document.getElementById('login_acct').value.trim()
       button = document.getElementById('login-button');
       warning = document.getElementById("login-warning");
-    } else if (document.getElementById('analyze_acct')) {
-      input = document.getElementById('analyze_acct').value.trim()
+
+      handle = input;
+    } else if (document.getElementById('analyze_username')) {
+      input = document.getElementById('analyze_username').value.trim()
+      instance = document.getElementById('analyze-instance').textContent;
       button = document.getElementById('analyze-button');
       warning = document.getElementById("analyze-warning");
 
-      const user = document.getElementById('analyze_acct').value;
+      handle = input + instance;
       const logged_user = document.body.getAttribute('data-mastodon-user');
 
-      if (user != logged_user) {
+      if (handle != logged_user) {
         document.getElementById("list-group").style.display = "none";
       } else {
         document.getElementById("list-group").style.display = "block";
       }
     }
     
-    if (is_valid_handle(input)) {
+    if (is_valid_handle(handle)) {
         warning.style.display = "none";
         button.classList.remove('disabled');
         button.removeAttribute('aria-disabled');
-        console.log("VALID!")
         return true;
     } else {
         if (input != "") {
@@ -166,17 +166,23 @@ td.td-first-col {
   }
 
   function analyze_submit() {
+
     var button = document.getElementById("analyze-button");
     button.disabled = true;
 
-    var acct = document.getElementById("analyze_acct");
-    acct.readOnly = true;
+    var username = document.getElementById("analyze_username").value;
+    username.readOnly = true;
+    const instance = document.getElementById("analyze-instance").textContent.trim();
 
     var text = document.getElementById("analyze-button-text");
     text.style.display = 'none';
 
     var loading = document.getElementById("analyze-loading");
     loading.style.display = 'block';
+
+    const handle = username + instance;
+
+    document.getElementById("analyze_acct").value = handle;
 
     document.getElementById('analyze-form').submit();
 
@@ -192,20 +198,22 @@ td.td-first-col {
 
   document.addEventListener('DOMContentLoaded', function() {
     // login-form might not immediately exists, so wait for page load
-    document.getElementById('login-form').onsubmit = function(event) {
-      event.preventDefault();
-      
-      const handle = document.getElementById('login_acct').value.trim();
+    if (document.getElementById('login-form')) {
+      document.getElementById('login-form').onsubmit = function(event) {
+        event.preventDefault();
+        
+        const handle = document.getElementById('login_acct').value.trim();
 
-      if (!is_valid_handle(input)) {
-        return;
-      }
+        if (!is_valid_handle(input)) {
+          return;
+        }
 
-      const instance = handle.split('@')[1];
-      const redirectUrl = `/login?instance=${encodeURIComponent(instance)}`;
-      
-      window.location.href = redirectUrl;
-    };
+        const instance = handle.split('@')[1];
+        const redirectUrl = `/login?instance=${encodeURIComponent(instance)}`;
+        
+        window.location.href = redirectUrl;
+      };
+    }
   }, false);
 </script>
 
@@ -237,23 +245,26 @@ td.td-first-col {
     <hr>
 
     {% if session.get('mastodon_user') %}
-      <h4>Hello, @{{ session.mastodon_user }}.</h4>
+      {% set parts = session.mastodon_user.split('@') %}
+      <h4>Hello, <b>{{ parts[0] }}</b>!</h4>
       <p><a href="/logout">Logout</a></p>
       <hr>
       <form method="post" id="analyze-form" onsubmit="return handle_analyze_submit(event)">
         <input type="hidden" name="form_type" value="analyze">
         <div class="form-group">
-          <label for="analyze_acct">Mastodon user handle:</label>
-          <div class="input-group col-xs-4">
+          <label for="analyze_username">Mastodon user handle:</label>
+          <div class="input-group col-12 col-sm-6 col-lg-4">
             <span class="input-group-addon">@</span>
-            <input type="text" class="form-control" name="analyze_acct" id="analyze_acct"
-              value="{{ form.analyze_acct.data|default(session.mastodon_user, true) }}" oninput="validate_input()">
+            <input type="text" class="form-control" name="analyze_username" id="analyze_username"
+              value="{{ parts[0] }}" oninput="validate_input()">
+            <span id="analyze-instance" class="input-group-addon">@{{ parts[1] }}</span>   
           </div>
-          <small id="analyze-warning" style="color: red; display: none;">Input full Mastodon handle (ie alexkalopsia@mastodon.social)</small>
+          <input type="hidden" name="analyze_acct" id="analyze_acct">
+          <small id="analyze-warning" style="color: red; display: none;">Input only Mastodon username</small>
           {% if form.lst %}
-          <div id="list-group">
+          <div id="list-group" style="margin-top: 12px;">
             <label for="lst">List:</label>
-            <div class="input-group col-xs-4">
+            <div class="input-group col-12 col-sm-6 col-lg-4">
               {{ form.lst(class_="form-control") }}
             </div>
           </div>
@@ -270,12 +281,12 @@ td.td-first-col {
         <input type="hidden" name="form_type" value="login">
         <div class="form-group">
           <label for="login_acct">Mastodon user handle:</label>
-          <div class="input-group col-xs-4">
+          <div class="input-group col-12 col-sm-6 col-lg-4">
             <span class="input-group-addon">@</span>
             <input type="text" class="form-control" name="login_acct" id="login_acct"
               value="{{ form.login_acct.data|default(session.mastodon_user, true) }}" oninput="validate_input()">
           </div>
-          <small id="login-warning" style="color: red; display: none;">Input full Mastodon handle (ie alexkalopsia@mastodon.social)</small>
+          <small id="login-warning" style="color: red; display: none;">Input full Mastodon handle (ie username@mastodon.social)</small>
         </div>
         <button id="login-button" type="submit" class="btn btn-primary disabled" onclick="login_submit()">
           <span id="login-button-text" >Log in with Mastodon</span>
