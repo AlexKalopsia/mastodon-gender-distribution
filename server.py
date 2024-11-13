@@ -116,8 +116,6 @@ def login():
 
     redirect_uri = url_for(
         "oauth_authorized",
-        client_id=client_id,
-        client_secret=client_secret,
         _external=True,
     )
     print(f"AUTH URL: {redirect_uri}")
