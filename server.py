@@ -155,9 +155,8 @@ def oauth_authorized():
 
     username = profile["username"]
     handle = f"{username}@{instance}"
-
-    session["mastodon_token"] = tok["access_token"]
     session["mastodon_user"] = handle
+    session["mastodon_token"] = tok["access_token"]
 
     try:
         session["lists"] = get_following_lists(
