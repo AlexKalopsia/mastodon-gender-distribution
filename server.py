@@ -82,7 +82,6 @@ def login():
         "mastodon-gender-distribution",
         api_base_url=f"https://{instance}",
         redirect_uris=[
-            "urn:ietf:wg:oauth:2.0:oob",
             f"{DEPLOY_URL}/authorized",
         ],
     )
@@ -101,14 +100,15 @@ def login():
     if "mastodon" in oauth._clients:
         del oauth._clients["mastodon"]
 
+    # scopes = "read:accounts read:statuses read:lists read:follows"
+    scopes = "read"
+
     oauth.register(
         name="mastodon",
         api_base_url=f"https://{instance}/api/v1",
         access_token_url=token_endpoint,
         authorize_url=auth_endpoint,
-        client_id=client_id,
-        client_secret=client_secret,
-        client_kwargs={"scope": "read"},
+        client_kwargs={"scope": scopes},
         fetch_token=lambda: session.get(
             "mastodon_token"
         ),  # DON'T DO IT IN PRODUCTION
@@ -118,7 +118,6 @@ def login():
         "oauth_authorized",
         client_id=client_id,
         client_secret=client_secret,
-        handle=handle,
         _external=True,
     )
     print(f"AUTH URL: {redirect_uri}")
@@ -141,10 +140,7 @@ def handle_error(error):
 @app.route("/authorized")
 def oauth_authorized():
 
-    args = request.args
-    handle = args.get("handle")
-
-    _, instance = parse_mastodon_handle(handle)
+    instance = session["instance"]
 
     tok = oauth.mastodon.authorize_access_token()
     response = oauth.mastodon.get(
@@ -156,6 +152,9 @@ def oauth_authorized():
     except ValueError as e:
         print("JSON decode error:", e)
         return "Failed to decode JSON response"
+
+    username = profile["username"]
+    handle = f"{username}@{instance}"
 
     session["mastodon_token"] = tok["access_token"]
     session["mastodon_user"] = handle
