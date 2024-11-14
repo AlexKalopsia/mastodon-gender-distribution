@@ -16,6 +16,7 @@ from flask import (  # pip install Flask
     url_for,
 )
 from mastodon import Mastodon, MastodonNetworkError, MastodonNotFoundError
+import urllib
 from wtforms import Form, SelectField, StringField  # pip install WTForms
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -76,6 +77,8 @@ def login():
         else f"https://{instance}/oauth/authorize"
     )
 
+    scopes = ["read:accounts", "read:statuses", "read:lists", "read:follows"]
+
     print(f"DEPLOY TO: {DEPLOY_URL}")
 
     client_id, client_secret = Mastodon.create_app(
@@ -84,6 +87,7 @@ def login():
         redirect_uris=[
             f"{DEPLOY_URL}/authorized",
         ],
+        scopes=scopes,
     )
 
     app.config["MASTODON_CLIENT_ID"] = client_id
@@ -100,15 +104,12 @@ def login():
     if "mastodon" in oauth._clients:
         del oauth._clients["mastodon"]
 
-    # scopes = "read:accounts read:statuses read:lists read:follows"
-    scopes = "read"
-
     oauth.register(
         name="mastodon",
         api_base_url=f"https://{instance}/api/v1",
         access_token_url=token_endpoint,
         authorize_url=auth_endpoint,
-        client_kwargs={"scope": scopes},
+        client_kwargs={"scope": " ".join(scopes)},
         fetch_token=lambda: session.get(
             "mastodon_token"
         ),  # DON'T DO IT IN PRODUCTION
@@ -118,7 +119,6 @@ def login():
         "oauth_authorized",
         _external=True,
     )
-    print(f"AUTH URL: {redirect_uri}")
     return oauth.mastodon.authorize_redirect(redirect_uri)
 
 
