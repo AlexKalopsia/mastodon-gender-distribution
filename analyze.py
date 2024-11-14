@@ -419,13 +419,12 @@ def get_mastodon_api(access_token, instance="mastodon.social"):
     )
 
 
-# 5000 ids per call.
+# 80 ids per call (total 800).
 MAX_GET_FOLLOWING_IDS_CALLS = 10
 MAX_GET_FOLLOWER_IDS_CALLS = 10
 
 # 100 users per call.
 MAX_USERS_LOOKUP_CALLS = 30
-
 MAX_TIMELINE_CALLS = 10
 
 
@@ -466,6 +465,8 @@ def fetch_users(user_ids, api, cache):
         #     id = (int(id.timestamp()) << 16) * 1000
         # return id
 
+        # I should not refetch the users
+
         url = f"{api.api_base_url}/api/v1/accounts"
         params = {"id[]": ids}
 
@@ -495,7 +496,7 @@ def analyze_following(user_id, list_id, api, cache):
     else:
         accounts = api.account_following(id=user_id, limit=80)
 
-    for _ in range(MAX_GET_FOLLOWING_IDS_CALLS):
+    for _ in range(MAX_GET_FOLLOWING_IDS_CALLS - 1):
         if not accounts:
             break
 
@@ -508,8 +509,10 @@ def analyze_following(user_id, list_id, api, cache):
 
     if not following_ids:
         return Analysis(0, 0)
+    
+    # I have all the accounts data
 
-    # We can fetch users' details 100 at a time.
+    # Get a maximum of 3000 users (randomly sampled)
     if len(following_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
         following_id_sample = random.sample(
             following_ids, 100 * MAX_USERS_LOOKUP_CALLS
@@ -526,7 +529,7 @@ def analyze_followers(user_id, api, cache):
 
     accounts = api.account_followers(id=user_id, limit=80)
 
-    for _ in range(MAX_GET_FOLLOWER_IDS_CALLS):
+    for _ in range(MAX_GET_FOLLOWER_IDS_CALLS - 1):
         if not accounts:
             break
 
