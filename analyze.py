@@ -55,6 +55,7 @@ class User:
         moved=False,
         limited=False,
         suspended=False,
+        avatar_remote_url=None,
     ):
         self.id = id
         self.username = username
@@ -85,6 +86,7 @@ class User:
         self.moved = moved
         self.limited = limited
         self.suspended = suspended
+        self.avatar_remote_url = avatar_remote_url
 
 
 def split(s):

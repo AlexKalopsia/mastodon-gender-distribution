@@ -1,6 +1,8 @@
 import logging
 import os
+import re
 import requests
+import webfinger
 
 from authlib.integrations.flask_client import (
     OAuth,
@@ -50,9 +52,25 @@ oauth = OAuth(app)
 
 @app.route("/login")
 def login():
-    # Get instance from login field
+    # Get handle from login field
     handle = request.args.get("handle", "alexkalopsia@mastodon.social")
-    _, instance = parse_mastodon_handle(handle)
+
+    # Look for actual instance url using webfinger request. This is done because
+    # a user username@instance.name could exist in an instance that is located
+    # on subdomain.instance.name
+
+    resource = f"acct:{handle}"
+    webfinger_data = webfinger.finger(resource)
+    profile_url = next(
+        (
+            link["href"]
+            for link in webfinger_data.get("links", [])
+            if link.get("rel") == "self"
+        ),
+        None,
+    )
+    match = re.search(r"https://([^/]+)/", profile_url)
+    instance = match.group(1)
 
     metadata = None
 
@@ -95,6 +113,10 @@ def login():
     session["client_id"] = client_id
     session["client_secret"] = client_secret
     session["instance"] = instance
+
+    # Store user-facing handle instance
+    _, handle_instance = parse_mastodon_handle(handle)
+    session["handle_instance"] = handle_instance
 
     oauth.register(
         name=instance,
@@ -144,8 +166,11 @@ def oauth_authorized():
         print("JSON decode error:", e)
         return "Failed to decode JSON response"
 
+    # Update handle to user-facing instance, as opposed to the
+    # one obtained via webfinger
     username = profile["username"]
-    handle = f"{username}@{instance}"
+    handle_instance = session["handle_instance"]
+    handle = f"{username}@{handle_instance}"
     session["mastodon_user"] = handle
     session["mastodon_token"] = token["access_token"]
 
@@ -212,7 +237,12 @@ def index():
                     for list in session["lists"]
                 ]
 
+            # We take the form handle, and replace the instance with
+            # the correct one obtained with webfinger
             handle = form.analyze_acct.data
+            username = handle.split("@")[0]
+            instance = session["instance"]
+            handle = f"{username}@{instance}"
 
             session_user = session.get("mastodon_user")
             different_user = form.analyze_acct.data != session_user
