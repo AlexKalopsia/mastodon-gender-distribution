@@ -16,7 +16,6 @@ from flask import (  # pip install Flask
     url_for,
 )
 from mastodon import Mastodon, MastodonNetworkError, MastodonNotFoundError
-import urllib
 from wtforms import Form, SelectField, StringField  # pip install WTForms
 from werkzeug.middleware.proxy_fix import ProxyFix
 
