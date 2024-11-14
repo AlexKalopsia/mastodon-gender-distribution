@@ -96,15 +96,10 @@ def login():
     session["client_secret"] = client_secret
     session["instance"] = instance
 
-    # Register client
-    # TODO: this should not happen every login
-
-    # This is necessary for subsequent logins on different instances
-    if "mastodon" in oauth._clients:
-        del oauth._clients["mastodon"]
-
     oauth.register(
-        name="mastodon",
+        name=instance,
+        client_id=session["client_id"],
+        client_secret=session["client_secret"],
         api_base_url=f"https://{instance}/api/v1",
         access_token_url=token_endpoint,
         authorize_url=auth_endpoint,
@@ -114,11 +109,14 @@ def login():
         ),  # DON'T DO IT IN PRODUCTION
     )
 
+    client = oauth.create_client(instance)
+
     redirect_uri = url_for(
         "oauth_authorized",
         _external=True,
     )
-    return oauth.mastodon.authorize_redirect(redirect_uri)
+
+    return client.authorize_redirect(redirect_uri)
 
 
 @app.route("/logout")
@@ -138,9 +136,10 @@ def handle_error(error):
 def oauth_authorized():
 
     instance = session["instance"]
+    client = oauth._clients.get(instance)
 
-    tok = oauth.mastodon.authorize_access_token()
-    response = oauth.mastodon.get(
+    tok = client.authorize_access_token()
+    response = client.get(
         f"https://{instance}/api/v1/accounts/verify_credentials"
     )
 
