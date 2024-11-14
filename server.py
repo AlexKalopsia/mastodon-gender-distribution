@@ -52,6 +52,9 @@ oauth = OAuth(app)
 def login():
     # Get instance from login field
     handle = request.args.get("handle", "alexkalopsia@mastodon.social")
+    # FIXME: this actually doesn't work correctly because my handle may be @alice@server.example 
+    # but the instance URL might be social.server.example, you'd need to do a webfinger request 
+    # to discover their profile-page
     _, instance = parse_mastodon_handle(handle)
 
     metadata = None
@@ -78,18 +81,18 @@ def login():
 
     print(f"DEPLOY TO: {DEPLOY_URL}")
 
+    redirect_uri = url_for("oauth_authorized", _external=True)
+    scopes = ['read:accounts', 'read:statuses', 'read:lists', 'read:follows']
+    # TODO: store this in the database for the server
     client_id, client_secret = Mastodon.create_app(
         "mastodon-gender-distribution",
         api_base_url=f"https://{instance}",
         redirect_uris=[
-            "urn:ietf:wg:oauth:2.0:oob",
-            f"{DEPLOY_URL}/authorized",
+            redirect_uri
         ],
+        scopes=scopes,
     )
 
-    app.config["MASTODON_CLIENT_ID"] = client_id
-    app.config["MASTODON_CLIENT_SECRET"] = client_secret
-    app.config["MASTODON_INSTANCE"] = instance
     session["client_id"] = client_id
     session["client_secret"] = client_secret
     session["instance"] = instance
@@ -97,32 +100,22 @@ def login():
     # Register client
     # TODO: this should not happen every login
 
-    # This is necessary for subsequent logins on different instances
-    if "mastodon" in oauth._clients:
-        del oauth._clients["mastodon"]
-
     oauth.register(
-        name="mastodon",
+        name=instance,
         api_base_url=f"https://{instance}/api/v1",
         access_token_url=token_endpoint,
         authorize_url=auth_endpoint,
         client_id=client_id,
         client_secret=client_secret,
-        client_kwargs={"scope": "read"},
+        client_kwargs={"scope": scopes.join(' ')},
         fetch_token=lambda: session.get(
             "mastodon_token"
         ),  # DON'T DO IT IN PRODUCTION
     )
 
-    redirect_uri = url_for(
-        "oauth_authorized",
-        client_id=client_id,
-        client_secret=client_secret,
-        handle=handle,
-        _external=True,
-    )
-    print(f"AUTH URL: {redirect_uri}")
-    return oauth.mastodon.authorize_redirect(redirect_uri)
+
+    oauthClient = oauth.create_client(instance)
+    return oauthClient.authorize_redirect(redirect_uri)
 
 
 @app.route("/logout")
@@ -142,12 +135,14 @@ def handle_error(error):
 def oauth_authorized():
 
     args = request.args
-    handle = args.get("handle")
+    instance = session.get("instance")
 
-    _, instance = parse_mastodon_handle(handle)
+    return "Missing instance" if not instance
 
-    tok = oauth.mastodon.authorize_access_token()
-    response = oauth.mastodon.get(
+    oauthClient = oauth.create_client(instance)
+    token = oauthClient.authorize_access_token()
+    
+    response = oauthClient.get(
         f"https://{instance}/api/v1/accounts/verify_credentials"
     )
 
@@ -157,13 +152,13 @@ def oauth_authorized():
         print("JSON decode error:", e)
         return "Failed to decode JSON response"
 
-    session["mastodon_token"] = tok["access_token"]
-    session["mastodon_user"] = handle
+    session["mastodon_token"] = token["access_token"]
+    session["mastodon_user"] = [profile["username"], instance].join('@')
 
     try:
         session["lists"] = get_following_lists(
             profile["id"],
-            tok["access_token"],
+            token["access_token"],
             instance,
         )
     except Exception:
