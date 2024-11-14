@@ -1,6 +1,6 @@
 import logging
 import os
-import re
+from urllib.parse import urlparse
 import requests
 import webfinger
 
@@ -69,8 +69,8 @@ def login():
         ),
         None,
     )
-    match = re.search(r"https://([^/]+)/", profile_url)
-    instance = match.group(1)
+    parsed_url = urlparse(profile_url)
+    instance = parsed_url.hostname
 
     metadata = None
 
