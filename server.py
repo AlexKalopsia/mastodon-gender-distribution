@@ -80,18 +80,18 @@ def login():
 
     print(f"DEPLOY TO: {DEPLOY_URL}")
 
+    redirect_uri = url_for(
+        "oauth_authorized",
+        _external=True,
+    )
+
     client_id, client_secret = Mastodon.create_app(
         "mastodon-gender-distribution",
         api_base_url=f"https://{instance}",
-        redirect_uris=[
-            f"{DEPLOY_URL}/authorized",
-        ],
+        redirect_uris=[redirect_uri],
         scopes=scopes,
     )
 
-    app.config["MASTODON_CLIENT_ID"] = client_id
-    app.config["MASTODON_CLIENT_SECRET"] = client_secret
-    app.config["MASTODON_INSTANCE"] = instance
     session["client_id"] = client_id
     session["client_secret"] = client_secret
     session["instance"] = instance
@@ -110,11 +110,6 @@ def login():
     )
 
     client = oauth.create_client(instance)
-
-    redirect_uri = url_for(
-        "oauth_authorized",
-        _external=True,
-    )
 
     return client.authorize_redirect(redirect_uri)
 
@@ -138,7 +133,7 @@ def oauth_authorized():
     instance = session["instance"]
     client = oauth._clients.get(instance)
 
-    tok = client.authorize_access_token()
+    token = client.authorize_access_token()
     response = client.get(
         f"https://{instance}/api/v1/accounts/verify_credentials"
     )
@@ -152,12 +147,12 @@ def oauth_authorized():
     username = profile["username"]
     handle = f"{username}@{instance}"
     session["mastodon_user"] = handle
-    session["mastodon_token"] = tok["access_token"]
+    session["mastodon_token"] = token["access_token"]
 
     try:
         session["lists"] = get_following_lists(
             profile["id"],
-            tok["access_token"],
+            token["access_token"],
             instance,
         )
     except Exception:
