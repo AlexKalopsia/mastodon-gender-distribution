@@ -152,8 +152,9 @@ def handle_error(error):
 @app.route("/authorized")
 def oauth_authorized():
 
+    # Get existing oauth client
     instance = session["instance"]
-    client = oauth._clients.get(instance)
+    client = oauth.create_client(instance)
 
     token = client.authorize_access_token()
     response = client.get(
