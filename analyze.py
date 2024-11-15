@@ -449,6 +449,7 @@ def analyze_self(handle, api):
 
 def fetch_users(users, cache):
     fetched_users = []
+
     user_ids = [user.id for user in users]
     cached_users = cache.UsersLookup(user_ids)
 
@@ -617,11 +618,11 @@ def analyze_my_timeline(user_id, api, cache):
         "replies": reply_ids,
         "mentions": timeline_ids,
     }
-    newdict = {}
-    for ids in outdict.keys():
-        users = fetch_users(outdict.get(ids), cache)
-        newdict[ids] = analyze_users(users, ids_fetched=len(outdict.get(ids)))
-    return newdict
+    # newdict = {}
+    # for ids in outdict.keys():
+    #    users = fetch_users(outdict.get(ids), cache)
+    #    newdict[ids] = analyze_users(users, ids_fetched=len(outdict.get(ids)))
+    return outdict
 
 
 def get_access_token(client_id, client_secret, instance):
@@ -763,10 +764,11 @@ if __name__ == "__main__":
         following = analyze_following(user_id, None, api, cache)
         followers = analyze_followers(user_id, api, cache)
         timeline = analyze_timeline(user_id, None, api, cache)
-        mytimeline = analyze_my_timeline(user_id, api, cache)
-        boosts = mytimeline.get("boosts")
-        replies = mytimeline.get("replies")
-        mentions = mytimeline.get("mentions")
+        # TODO: implement Mastodon-compatible analyze_my_timeline
+        # mytimeline = analyze_my_timeline(user_id, api, cache)
+        # boosts = mytimeline.get("boosts")
+        # replies = mytimeline.get("replies")
+        # mentions = mytimeline.get("mentions")
 
     duration = time.time() - start
 
@@ -774,9 +776,9 @@ if __name__ == "__main__":
         ("following", following),
         ("followers", followers),
         ("timeline", timeline),
-        ("boosts", boosts),
-        ("replies", replies),
-        ("mentions", mentions),
+        # ("boosts", boosts),
+        # ("replies", replies),
+        # ("mentions", mentions),
     ]:
 
         # Check if the list is empty
