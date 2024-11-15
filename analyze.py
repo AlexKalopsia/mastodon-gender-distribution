@@ -447,49 +447,29 @@ def analyze_self(handle, api):
     return analyze_user(user)
 
 
-def fetch_users(user_ids, api, cache):
-    users = []
+def fetch_users(users, cache):
+    fetched_users = []
+    user_ids = [user.id for user in users]
+    cached_users = cache.UsersLookup(user_ids)
+
     # Add cached users
-    users.extend(cache.UsersLookup(user_ids))
+    fetched_users.extend(cached_users)
 
-    # Batch of uncached users
-    new_users = []
-    for ids in batch(cache.UncachedUsers(user_ids), 40):
-        # TODO: Change to api.accounts(ids=ids) once PR is merged on Mastodon.py
-        # results = api.accounts(ids=ids)
-
-        # ids = [self.__unpack_id(id) for id in ids]
-        # if isinstance(id, dict) and "id" in id:
-        #     id = id["id"]
-        # if dateconv and isinstance(id, datetime.datetime):
-        #     id = (int(id.timestamp()) << 16) * 1000
-        # return id
-
-        # I should not refetch the users
-
-        url = f"{api.api_base_url}/api/v1/accounts"
-        params = {"id[]": ids}
-
-        try:
-            response = requests.get(url, params=params)
-            response.raise_for_status()
-            results = response.json()
-
-            # [{'id': 1, 'username': 'Gargron', ...}]
-            for account in results:
-                new_users.append(User(**account))
-        except requests.RequestException as exc:
-            print(f"An error occurred: {exc}")
-            continue
-
-    cache.AddUsers(new_users)
-    users.extend(new_users)
+    # Add uncached users
+    uncached_users = [
+        user
+        for user in users
+        if user.id not in {cached_user.id for cached_user in cached_users}
+    ]
+    cache.AddUsers(uncached_users)
+    fetched_users.extend(uncached_users)
 
     return users
 
 
 def analyze_following(user_id, list_id, api, cache):
-    following_ids = []
+
+    following_accounts = []
 
     if list_id is not None:
         accounts = api.list_accounts(id=list_id, limit=80)
@@ -500,60 +480,58 @@ def analyze_following(user_id, list_id, api, cache):
         if not accounts:
             break
 
-        following_ids.extend([account.id for account in accounts])
+        following_accounts.extend(accounts)
 
         accounts = api.fetch_next(accounts)
 
         if accounts is None:
             break
 
-    if not following_ids:
+    if following_accounts is None:
         return Analysis(0, 0)
-    
-    # I have all the accounts data
 
     # Get a maximum of 3000 users (randomly sampled)
-    if len(following_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
-        following_id_sample = random.sample(
-            following_ids, 100 * MAX_USERS_LOOKUP_CALLS
+    if len(following_accounts) > 100 * MAX_USERS_LOOKUP_CALLS:
+        following_sample = random.sample(
+            following_accounts, 100 * MAX_USERS_LOOKUP_CALLS
         )
     else:
-        following_id_sample = following_ids
+        following_sample = following_accounts
 
-    users = fetch_users(following_id_sample, api, cache)
-    return analyze_users(users, ids_fetched=len(following_ids))
+    users = fetch_users(following_sample, cache)
+    return analyze_users(users, ids_fetched=len(following_sample))
 
 
 def analyze_followers(user_id, api, cache):
-    follower_ids = []
 
+    follower_accounts = []
     accounts = api.account_followers(id=user_id, limit=80)
 
     for _ in range(MAX_GET_FOLLOWER_IDS_CALLS - 1):
         if not accounts:
             break
 
-        follower_ids.extend([account.id for account in accounts])
+        follower_accounts.extend(accounts)
 
         accounts = api.fetch_next(accounts)
 
         if accounts is None:
             break
 
-    if not follower_ids:
+    if follower_accounts is None:
         return Analysis(0, 0)
 
-    # We can fetch users' details 100 at a time.
-    if len(follower_ids) > 100 * MAX_USERS_LOOKUP_CALLS:
-        follower_ids_sample = random.sample(
-            follower_ids, 100 * MAX_USERS_LOOKUP_CALLS
+    # Get a maximum of 3000 users (randomly sampled)
+    if len(follower_accounts) > 100 * MAX_USERS_LOOKUP_CALLS:
+        followers_sample = random.sample(
+            follower_accounts, 100 * MAX_USERS_LOOKUP_CALLS
         )
     else:
-        follower_ids_sample = follower_ids
+        followers_sample = follower_accounts
 
     # Sample of 40
-    users = fetch_users(follower_ids_sample, api, cache)
-    return analyze_users(users, ids_fetched=len(follower_ids))
+    users = fetch_users(followers_sample, cache)
+    return analyze_users(users, ids_fetched=len(followers_sample))
 
 
 """
@@ -563,7 +541,7 @@ Analyze the timeline containing the user's following and followers' toots
 
 def analyze_timeline(user_id, list_id, api, cache):
     # Timeline-functions are limited to 40 statuses
-    timeline_ids = []
+    timeline_accounts = []
 
     if list_id is not None:
         statuses = api.timeline_list(id=list_id, limit=40)
@@ -575,8 +553,8 @@ def analyze_timeline(user_id, list_id, api, cache):
         if not statuses:
             break
 
-        timeline_ids.extend(
-            [s.account.id for s in statuses if s.account.id != user_id]
+        timeline_accounts.extend(
+            [s.account for s in statuses if s.account.id != user_id]
         )
 
         statuses = api.fetch_next(statuses)
@@ -584,13 +562,13 @@ def analyze_timeline(user_id, list_id, api, cache):
         if statuses is None:
             break
 
-    if not timeline_ids:
+    if not timeline_accounts:
         return Analysis(0, 0)
 
     # Reduce to unique list of ids
-    timeline_ids = list(set(timeline_ids))
-    users = fetch_users(timeline_ids, api, cache)
-    return analyze_users(users, ids_fetched=len(timeline_ids))
+    timeline_accounts = list(timeline_accounts)
+    users = fetch_users(timeline_accounts, cache)
+    return analyze_users(users, ids_fetched=len(timeline_accounts))
 
 
 """
@@ -641,7 +619,7 @@ def analyze_my_timeline(user_id, api, cache):
     }
     newdict = {}
     for ids in outdict.keys():
-        users = fetch_users(outdict.get(ids), api, cache)
+        users = fetch_users(outdict.get(ids), cache)
         newdict[ids] = analyze_users(users, ids_fetched=len(outdict.get(ids)))
     return newdict
 
