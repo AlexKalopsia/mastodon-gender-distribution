@@ -1,5 +1,5 @@
-# This file contains an example WSGI configuration required to serve up your
-# web application at https://yourproject.pythonanywhere.com/
+# This file contains an example WSGI configuration required to serve up the
+# web application on https://yourproject.pythonanywhere.com/
 # It works by setting the variable 'application' to a WSGI handler of some
 # description.
 
