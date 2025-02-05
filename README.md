@@ -6,7 +6,7 @@ Gender Distribution of Mastodon Connections and Followers
 > before the free API got shut down.\
 > I have adapted the original project to work with Mastodon.
 
-Mastodon Proporti.onl guesses the gender of your followers and those you follow by looking in
+Mastodon Proportional guesses the gender of your followers and those you follow by looking in
 their Mastodon profile names, bios, and extra fields for pronoun announcements like "she/her", or else guessing it
 based on first name.
 
@@ -25,9 +25,9 @@ py -m pip install -r requirements.txt
 Deploy
 -------
 
-The repo contains an example `app_render.wsgi` config useful when deploying to PythonAnywhere.
+The repo contains an example `app_render.wsgi` config useful when deploying to [PythonAnywhere](https://www.pythonanywhere.com/).
 
-If you want to deploy to Radar, make sure you set the `COOKIE_SECRET` and `DEPLOY_URL` env variables.
+If you want to deploy to [Railway](https://railway.com/), make sure you set the `COOKIE_SECRET` and `DEPLOY_URL` env variables.
 
 Command-line Use
 ----------------
@@ -48,7 +48,7 @@ From the repository root directory:
 py -m unittest discover -v
 ```
 
-Website
+Local server
 -------
 
 Start a Flask server for testing:
