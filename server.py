@@ -7,8 +7,8 @@ import webfinger
 from authlib.integrations.flask_client import (
     OAuth,
     OAuthError,
-)  # pip install Authlib
-from flask import (  # pip install Flask
+)
+from flask import (
     Flask,
     flash,
     redirect,
@@ -18,7 +18,7 @@ from flask import (  # pip install Flask
     url_for,
 )
 from mastodon import Mastodon, MastodonNetworkError, MastodonNotFoundError
-from wtforms import Form, SelectField, StringField  # pip install WTForms
+from wtforms import Form, SelectField, StringField
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from analyze import (

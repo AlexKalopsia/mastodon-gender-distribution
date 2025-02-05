@@ -11,8 +11,7 @@ import gender_guesser.detector as gender
 from mastodon import (
     Mastodon,
 )
-import requests
-from requests_oauthlib import OAuth2Session  # pip install requests-oauthlib
+from requests_oauthlib import OAuth2Session
 from unidecode import unidecode
 
 if os.path.exists("detector.pickle"):
