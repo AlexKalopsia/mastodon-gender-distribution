@@ -25,9 +25,9 @@ py -m pip install -r requirements.txt
 Deploy
 -------
 
-The repo contains an example `app_render.wsgi` config useful when deploying to PythonAnywhere.
+The repo contains an example `app_render.wsgi` config useful when deploying to [PythonAnywhere](https://www.pythonanywhere.com/).
 
-If you want to deploy to Radar, make sure you set the `COOKIE_SECRET` and `DEPLOY_URL` env variables.
+If you want to deploy to [Railway](https://railway.com/), make sure you set the `COOKIE_SECRET` and `DEPLOY_URL` env variables.
 
 Command-line Use
 ----------------
@@ -48,7 +48,7 @@ From the repository root directory:
 py -m unittest discover -v
 ```
 
-Website
+Local server
 -------
 
 Start a Flask server for testing:
