@@ -6,7 +6,7 @@ Gender Distribution of Mastodon Connections and Followers
 > before the free API got shut down.\
 > I have adapted the original project to work with Mastodon.
 
-Mastodon Proporti.onl guesses the gender of your followers and those you follow by looking in
+Mastodon Proportional guesses the gender of your followers and those you follow by looking in
 their Mastodon profile names, bios, and extra fields for pronoun announcements like "she/her", or else guessing it
 based on first name.
 
