@@ -29,24 +29,19 @@ The repo contains an example `app_render.wsgi` config useful when deploying to [
 
 If you want to deploy to [Railway](https://railway.com/), make sure you set the `COOKIE_SECRET` and `DEPLOY_URL` env variables.
 
-Command-line Use
+Command-line
 ----------------
 
-Pass a Mastodon user handle to analyze the accounts the user follows and their followers.\
-It supports formats such as `alexkalopsia`, `@alexkalopsia`, `@alexkalopsia@mastodon.social` and `alexkalopsia@mastodon.social`:
+First and foremost, you need to login on your Mastodon instance, open your profile, and go on
+_Preferences > Development > New Application_. Pick a name, select `read` and `profile` permissions, and keep note of your
+**Client key** and **Client secret**, as you will need to input them in the terminal when asked.  
 
 ```python
 py analyze.py alexkalopsia@mastodon.social
 ```
 
-Test
-----
-
-From the repository root directory:
-
-```python
-py -m unittest discover -v
-```
+Pass a Mastodon user handle to analyze the accounts the user follows and their followers.\
+It supports formats such as `alexkalopsia`, `@alexkalopsia`, `@alexkalopsia@mastodon.social` and `alexkalopsia@mastodon.social`.
 
 Local server
 -------
@@ -63,4 +58,13 @@ Windows
 
 ```bash
 $env:COOKIE_SECRET="foo"; py server.py 8000
+```
+
+Test
+----
+
+From the repository root directory:
+
+```python
+py -m unittest discover -v
 ```
